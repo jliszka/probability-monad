@@ -6,7 +6,7 @@ For example, here's how you would code up the following problem: You are given e
 biased coin with equal probability. If you flip it 5 times and it comes up heads each time, what is the
 probability you have the fair coin?
 
-    def bayesianCoin(flips: Int) = {
+    def bayesianCoin(flips: Int): Distribution[(Int, List[Coin])] = {
       for {
         whichCoin <- d(2)
         c = if (whichCoin == 1) coin else biasedCoin(0.9)

@@ -109,9 +109,8 @@ object Examples {
   def population(families: Int) = {
     for {
       children <- family.repeat(families).map(_.flatten)
-      val boys = children.count(_ == Boy)
       val girls = children.count(_ == Girl)
-    } yield 1.0 * girls / (girls + boys)
+    } yield 1.0 * girls / children.length
   }
   def runBoyGirl = population(4).ev
 }
