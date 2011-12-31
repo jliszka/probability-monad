@@ -19,5 +19,5 @@ probability you have the fair coin?
 [Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains code
 for creating and manipulating probability distributions.
 
-[Examples.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains some 
+[Examples.scala](https://github.com/jliszka/probability-monad/blob/master/Examples.scala) contains some 
 examples, possibly a RISK simulator.
