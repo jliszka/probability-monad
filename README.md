@@ -45,7 +45,7 @@ Methods for manipulating distributions include:
 - conditional distributions (amounts to a filter)
 - mapping and flatMapping values inside the distribution
 - creating Markov chains
-- probability of arbitrary predicates
+- finding the probability of arbitrary predicates, conditional probabililty
 - finding expected values
 - sampling, histogram
 

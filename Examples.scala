@@ -116,8 +116,8 @@ object Examples {
 
 
   /**
-   * A single bank teller can service a customer in 9 minutes. If one customer
-   * comes in every 10 minutes, what is the expected length of the line?
+   * A single bank teller can service a customer in 10 minutes. If one customer
+   * comes in every 11 minutes on average, what is the expected length of the line?
    */
 
   def queue(loadFactor: Double) = {
@@ -128,8 +128,8 @@ object Examples {
 
 
   /**
-   * You roll a 6-sided die and keep a running sum. What is the probability you
-   * reach exactly 30?
+   * You roll a 6-sided die and keep a running sum. What is the probability the
+   * sum reaches exactly 30?
    */
 
   def dieSum(rolls: Int): Distribution[List[Int]] = {
