@@ -40,7 +40,9 @@ trait Distribution[A] {
   
   private val nn = 1000
 
-  def p(pred: A => Boolean, given: A => Boolean = (a: A) => true): Double = 1.0 * filter(given).sample(nn).count(pred) / nn
+  def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true): Double = {
+    1.0 * this.filter(given).sample(nn).count(pred) / nn
+  }
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
   // value of a die roll, for example, you have to do die.map(_.toDouble).ev.
@@ -124,8 +126,8 @@ object Distribution {
 	}
       }
     }
-    val table = alias(smaller, bigger)
-    private def select(p1: Double, p2: Double, table: List[(A, Double, Option[A])]): A = {
+    val table = Vector() ++ alias(smaller, bigger)
+    private def select(p1: Double, p2: Double, table: Vector[(A, Double, Option[A])]): A = {
       table((p1 * len).toInt) match {
 	case (a, _, None) => a
 	case (a, p, Some(b)) => if (p2 <= p) a else b
@@ -147,4 +149,13 @@ object Distribution {
   def chi2(n: Int) = List.fill(n)(normal).map(x => x*x).reduceLeft[Distribution[Double]](_ + _)
 
   lazy val cauchy = normal / normal
+
+  def markov[A](n: Int, init: A)(f: A => Distribution[A]): Distribution[A] = {
+    @tailrec
+    def helper(n: Int, curr: Distribution[A]): Distribution[A] = {
+      if (n == 0) curr
+      else helper(n-1, curr.flatMap(f))
+    }
+    helper(n, always(init))
+  }
 }

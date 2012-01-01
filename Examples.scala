@@ -8,12 +8,12 @@ object Examples {
 
   def bayesianCoin(flips: Int) = {
     for {
-      whichCoin <- d(2)
-      val c = if (whichCoin == 1) coin else biasedCoin(0.9)
+      haveFairCoin <- tf()
+      val c = if (haveFairCoin) coin else biasedCoin(0.9)
       results <- c.repeat(flips)
-    } yield (whichCoin, results)
+    } yield (haveFairCoin, results)
   }
-  def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_._2.forall(_ == H)).p(_._1 == 1)
+  def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_._2.forall(_ == H)).pr(_._1)
 
 
   /**
@@ -44,7 +44,7 @@ object Examples {
       r <- test(p)
     } yield (p, r)
   }
-  def runElisa = elisa.given(_._2).p(_._1 == Sick)
+  def runElisa = elisa.given(_._2).pr(_._1 == Sick)
 
 
   /**
@@ -113,4 +113,29 @@ object Examples {
     } yield 1.0 * girls / children.length
   }
   def runBoyGirl = population(4).ev
+
+
+  /**
+   * A single bank teller can service a customer in 9 minutes. If one customer
+   * comes in every 10 minutes, what is the expected length of the line?
+   */
+
+  def queue(loadFactor: Double) = {
+    val incoming = poisson(loadFactor)
+    markov(100, 0)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
+  }
+  def runBank = queue(0.9)
+
+
+  /**
+   * You roll a 6-sided die and keep a running sum. What is the probability you
+   * reach exactly 30?
+   */
+
+  def dieSum(rolls: Int): Distribution[List[Int]] = {
+    markov(rolls, List(0))(runningSum => for {
+      d <- die
+    } yield (d + runningSum.head) :: runningSum)
+  }
+  def runDieSum = dieSum(30).pr(_.contains(30))
 }
