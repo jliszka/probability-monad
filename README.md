@@ -32,7 +32,7 @@ for creating and manipulating probability distributions. Built-in distributions 
 
 - uniform continuous 
 - uniform discrete (including die and fair coin)
-- weighted discrete (biased coin)
+- weighted discrete (biased coin, uses the [alias method](http://www.keithschwarz.com/darts-dice-coins/))
 - normal
 - poisson
 - cauchy
@@ -40,7 +40,7 @@ for creating and manipulating probability distributions. Built-in distributions 
 
 Methods for manipulating distributions include:
 
-- adding, subracting, multiplying and dividing distributions
+- adding (convolution), subracting (cross-correlation), multiplying and dividing distributions
 - producing joint distributions from single distributions
 - conditional distributions (amounts to a filter)
 - mapping and flatMapping values inside the distribution

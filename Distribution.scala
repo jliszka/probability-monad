@@ -37,11 +37,28 @@ trait Distribution[A] {
   }
 
   def repeat(n: Int): Distribution[List[A]] = until(_.length == n)
+
+  @tailrec
+  final def iterate(n: Int, f: A => Distribution[A]): Distribution[A] = {
+    if (n == 0) this
+    else this.flatMap(f).iterate(n-1, f)
+  }
+
+  def iterateUntil(pred: A => Boolean, f: A => Distribution[A]): Distribution[A] = new Distribution[A] {
+    override def get = {
+      @tailrec
+      def helper(a: A): A = {
+	if (pred(a)) a
+	else helper(f(a).get)
+      }
+      helper(self.get)
+    }
+  }
   
   private val nn = 1000
 
-  def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true): Double = {
-    1.0 * this.filter(given).sample(nn).count(pred) / nn
+  def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = nn): Double = {
+    1.0 * this.filter(given).sample(samples).count(pred) / samples
   }
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
@@ -74,10 +91,39 @@ trait Distribution[A] {
   def hist = {
     this.sample(nn).groupBy(x=>x).mapValues(_.length.toDouble / nn)
   }
+
+  def plotHist(implicit ord: Ordering[A] = null) = {
+    val histogram = hist.toList
+    val sorted = if (ord == null) histogram else histogram.sortBy(_._1)(ord)
+    doPlot(sorted)
+  }
+
+  def plotBucketedHist(buckets: Int)(implicit ord: Ordering[A], frac: Fractional[A]) = {
+    val histogram = hist.toList.sortBy(_._1)(ord)
+    val min = histogram.first._1
+    val max = histogram.last._1
+    val bucketWidth = frac.div(frac.minus(max, min), frac.fromInt(buckets))
+    val halfBucketWidth = frac.div(bucketWidth, frac.fromInt(2))
+    def toBucket(a: A) = frac.toInt(frac.div(frac.minus(a, min), bucketWidth))
+    def fromBucket(n: Int) = frac.plus(frac.plus(frac.times(frac.fromInt(n), bucketWidth), min), halfBucketWidth)
+    val bucketed = histogram.map{ case (a, p) => (fromBucket(toBucket(a)), p) }
+      .groupBy(_._1)
+      .mapValues(_.map(_._2).sum)
+      .toList.sortBy(_._1)(ord)
+    doPlot(bucketed)
+  }
+
+  private def doPlot(data: Iterable[(A, Double)]) = {
+    val scale = 100
+    data.foreach{ case (a, p) => {
+      val hashes = (p * scale).toInt
+      println("%s %5.2f%% %s".format(a.toString, p*100, "#" * hashes))
+    }}    
+  }
 }
 
 object Distribution {
-  val rand = new Random()
+  private val rand = new Random()
 
   def always[A](value: A) = new Distribution[A] {
     override def get = value
@@ -150,12 +196,11 @@ object Distribution {
 
   lazy val cauchy = normal / normal
 
-  def markov[A](n: Int, init: A)(f: A => Distribution[A]): Distribution[A] = {
-    @tailrec
-    def helper(n: Int, curr: Distribution[A]): Distribution[A] = {
-      if (n == 0) curr
-      else helper(n-1, curr.flatMap(f))
-    }
-    helper(n, always(init))
+  def markov[A](init: A, steps: Int)(transition: A => Distribution[A]): Distribution[A] = {
+    always(init).iterate(steps, transition)
+  }
+
+  def markov[A](init: A)(stop: A => Boolean, transition: A => Distribution[A]): Distribution[A] = {
+    always(init).iterateUntil(stop, transition)
   }
 }

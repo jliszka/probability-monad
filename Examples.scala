@@ -52,7 +52,7 @@ object Examples {
    */
 
   def hth = coin.until(_.take(3) == List(H, T, H)).map(_.length)
-  def htt = coin.until(_.take(3) == List(H, T, T)).map(_.length)
+  def htt = coin.until(_.take(3) == List(T, T, H)).map(_.length)
 
 
   /**
@@ -122,7 +122,7 @@ object Examples {
 
   def queue(loadFactor: Double) = {
     val incoming = poisson(loadFactor)
-    markov(100, 0)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
+    markov(0, 100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
   }
   def runBank = queue(0.9)
 
@@ -133,9 +133,76 @@ object Examples {
    */
 
   def dieSum(rolls: Int): Distribution[List[Int]] = {
-    markov(rolls, List(0))(runningSum => for {
+    markov(List(0), rolls)(runningSum => for {
       d <- die
     } yield (d + runningSum.head) :: runningSum)
   }
   def runDieSum = dieSum(30).pr(_.contains(30))
+
+  /**
+   * Random walk: starting at 0 and moving left or right with equal probability,
+   * how many steps do you expect to take before reaching 10?
+   */
+
+  def randomWalk(target: Int, maxSteps: Int): Distribution[List[Int]] = {
+    markov(List(0))(steps => steps.head == target || steps.length == maxSteps, positions => for {
+      direction <- discreteUniform(List(-1, 1))
+    } yield (positions.head + direction) :: positions)
+  }
+  def runRandomWalk = randomWalk(10, 1000).map(_.length.toDouble).ev
+
+  /**
+   * Pascal's triangle
+   */
+
+  def pascal(depth: Int): Distribution[(Int, Int)] = {
+    markov((0, 0), depth){ case (left, right) => for {
+      moveLeft <- tf()
+    } yield {
+      if (moveLeft) (left+1, right) else (left, right+1)
+    }}
+  }
+  def runPascal = pascal(6).hist
+
+
+  /**
+   * Simpson's Paradox
+   */
+
+  abstract class Party
+  case object Democrat extends Party
+  case object Republican extends Party
+
+  abstract class State
+  case object North extends State
+  case object South extends State
+
+  def simpson(): Distribution[(Party, State, Boolean)] = {
+
+    def stateToParty(state: State) = state match {
+      case North => discrete(List(Democrat -> 154.0, Republican -> 162.0))
+      case South => discrete(List(Democrat -> 94.0, Republican -> 1.0))
+    }
+
+    def votedFor(party: Party, state: State): Distribution[Boolean] = {
+      (party, state) match {
+	case (Democrat, North) => tf(0.94)
+	case (Democrat, South) => tf(0.07)
+	case (Republican, North) => tf(0.85)
+	case (Republican, South) => tf(0.01)
+      }
+    }
+    val senators = discrete(List(
+      (Democrat, North) -> 154.0,
+      (Democrat, South) -> 94.0,
+      (Republican, North) -> 162.0,
+      (Republican, South) -> 1.0
+    ))
+    for {
+      (party, state) <- senators
+      vote <- votedFor(party, state)
+    } yield (party, state, vote)
+  }
+  def runSimpsonDem() = simpson().given(_._1 == Democrat).pr(_._3)
+  def runSimpsonRep() = simpson().given(_._1 == Republican).pr(_._3)
 }
