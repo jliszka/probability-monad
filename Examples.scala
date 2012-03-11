@@ -6,14 +6,15 @@ object Examples {
    * the fair coin?
    */
 
-  def bayesianCoin(flips: Int) = {
+  case class Trial(haveFairCoin: Boolean, flips: List[Coin])
+  def bayesianCoin(nflips: Int) = {
     for {
       haveFairCoin <- tf()
       val c = if (haveFairCoin) coin else biasedCoin(0.9)
-      results <- c.repeat(flips)
-    } yield (haveFairCoin, results)
+      flips <- c.repeat(nflips)
+    } yield Trial(haveFairCoin, flips)
   }
-  def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_._2.forall(_ == H)).pr(_._1)
+  def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
 
 
   /**
@@ -104,7 +105,7 @@ object Examples {
   case object Boy extends Child
   case object Girl extends Child
   def family = {
-    discreteUniform(List(Boy, Girl)).until(_.exists(_ == Boy))
+    discreteUniform(List(Boy, Girl)).until(_ contains Boy)
   }
   def population(families: Int) = {
     for {
@@ -124,7 +125,7 @@ object Examples {
     val incoming = poisson(loadFactor)
     markov(0, 100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
   }
-  def runBank = queue(0.9)
+  def runBank = queue(0.9).map(_.toDouble).ev
 
 
   /**
@@ -137,7 +138,7 @@ object Examples {
       d <- die
     } yield (d + runningSum.head) :: runningSum)
   }
-  def runDieSum = dieSum(30).pr(_.contains(30))
+  def runDieSum = dieSum(30).pr(_ contains 30)
 
   /**
    * Random walk: starting at 0 and moving left or right with equal probability,
@@ -205,4 +206,75 @@ object Examples {
   }
   def runSimpsonDem() = simpson().given(_._1 == Democrat).pr(_._3)
   def runSimpsonRep() = simpson().given(_._1 == Republican).pr(_._3)
+
+
+  /**
+   * Monty Hall problem
+   */
+
+  val montyHall = {
+    val doors = (1 to 3).toSet
+    for {
+      prize <- discreteUniform(doors)   // The prize is placed randomly
+      choice <- discreteUniform(doors)  // You choose randomly
+      opened <- discreteUniform(doors - prize - choice)   // Monty opens one of the other doors
+      switch <- discreteUniform(doors - choice - opened)  // You switch to the unopened door
+    } yield (prize, switch)
+  }
+  def runMontyHall = montyHall.pr{ case (prize, switch) => prize == switch }
+
+
+  /**
+   * Mr. Jones has two children. The older child is a girl.
+   * What is the probability that both children are girls?
+   */ 
+
+  val jones = {
+    discreteUniform(List(Boy, Girl))
+      .repeat(2)
+      .filter(_.head == Girl)
+  }
+  def runJones = jones.pr(_.forall(_ == Girl)) // 0.5
+  
+  /**
+   * Mr. Smith has two children. At least one of them is a boy.
+   * What is the probability that both children are boys?
+   */
+
+  val smith = {
+    discreteUniform(List(Boy, Girl))
+      .repeat(2)
+      .filter(_ contains Boy)
+  }
+  def runSmith = smith.pr(_.forall(_ == Boy)) // 0.333
+
+  /**
+   * Mr. Miller has two children. One of them is a boy born on Tuesday.
+   * What is the probability both children are boys?
+   */
+
+  val tuesday = {
+    val child = for {
+      sex <- discreteUniform(List(Boy, Girl))
+      day <- d(7)
+    } yield (sex, day)
+    child.repeat(2).filter(_ contains (Boy, 3))
+  }
+  def runTuesday = tuesday.pr(_.forall(_._1 == Boy)) // 0.47
+
+
+  /**
+   * Two envelopes problem
+   * TODO
+   */ 
+
+  val envelopes = {
+    for {
+      n <- coin.until(_ contains H).map(_.length)
+      amt1 = 1 << n      // likely to overflow
+      amt2 = 1 << (n+1)
+      w <- tf()
+      envs = if (w) (amt1, amt2) else (amt2, amt1)
+    } yield envs
+  }
 }

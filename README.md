@@ -6,15 +6,16 @@ For example, here's how you would code up the following problem: You are given e
 biased coin with equal probability. If you flip it 5 times and it comes up heads each time, what is the
 probability you have the fair coin?
 
-    def bayesianCoin(flips: Int): Distribution[(Int, List[Coin])] = {
+    case class Trial(haveFairCoin: Boolean, flips: List[Coin])
+    def bayesianCoin(nflips: Int): Distribution[(Int, List[Coin])] = {
       for {
         haveFairCoin <- tf()
         c = if (haveFairCoin) coin else biasedCoin(0.9)
-        results <- c.repeat(flips)
-      } yield (haveFairCoin, results)
+        flips <- c.repeat(nflips)
+      } yield Trial(haveFairCoin, flips)
     }
   
-    bayesianCoin(5).given(_._2.forall(_ == H)).pr(_._1 == true)
+    bayesianCoin(5).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
 
 Or: You repeatedly roll a 6-sided and keep a running sum. What is the probability the sum reaches
 exactly 30?
@@ -25,7 +26,7 @@ exactly 30?
       } yield (d + runningSum.head) :: runningSum)
     }
 
-    dieSum(30).pr(_.contains(30))
+    dieSum(30).pr(_ contains 30)
 
 [Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains code
 for creating and manipulating probability distributions. Built-in distributions include:
