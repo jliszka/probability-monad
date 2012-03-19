@@ -196,11 +196,11 @@ object Distribution {
 
   lazy val cauchy = normal / normal
 
-  def markov[A](init: A, steps: Int)(transition: A => Distribution[A]): Distribution[A] = {
-    always(init).iterate(steps, transition)
+  def markov[A](init: Distribution[A], steps: Int)(transition: A => Distribution[A]): Distribution[A] = {
+    init.iterate(steps, transition)
   }
 
-  def markov[A](init: A)(stop: A => Boolean, transition: A => Distribution[A]): Distribution[A] = {
-    always(init).iterateUntil(stop, transition)
+  def markov[A](init: Distribution[A])(stop: A => Boolean, transition: A => Distribution[A]): Distribution[A] = {
+    init.iterateUntil(stop, transition)
   }
 }

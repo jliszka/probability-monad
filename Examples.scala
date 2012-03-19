@@ -123,7 +123,7 @@ object Examples {
 
   def queue(loadFactor: Double) = {
     val incoming = poisson(loadFactor)
-    markov(0, 100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
+    markov(always(0), 100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
   }
   def runBank = queue(0.9).map(_.toDouble).ev
 
@@ -134,7 +134,7 @@ object Examples {
    */
 
   def dieSum(rolls: Int): Distribution[List[Int]] = {
-    markov(List(0), rolls)(runningSum => for {
+    markov(always(List(0)), rolls)(runningSum => for {
       d <- die
     } yield (d + runningSum.head) :: runningSum)
   }
@@ -146,7 +146,7 @@ object Examples {
    */
 
   def randomWalk(target: Int, maxSteps: Int): Distribution[List[Int]] = {
-    markov(List(0))(steps => steps.head == target || steps.length == maxSteps, positions => for {
+    markov(always(List(0)))(steps => steps.head == target || steps.length == maxSteps, positions => for {
       direction <- discreteUniform(List(-1, 1))
     } yield (positions.head + direction) :: positions)
   }
@@ -157,7 +157,7 @@ object Examples {
    */
 
   def pascal(depth: Int): Distribution[(Int, Int)] = {
-    markov((0, 0), depth){ case (left, right) => for {
+    markov(always((0, 0)), depth){ case (left, right) => for {
       moveLeft <- tf()
     } yield {
       if (moveLeft) (left+1, right) else (left, right+1)
@@ -277,4 +277,68 @@ object Examples {
       envs = if (w) (amt1, amt2) else (amt2, amt1)
     } yield envs
   }
+
+
+  /**
+   * Bayesian networks
+   */
+
+  sealed trait BloodGene
+  case object A_ extends BloodGene
+  case object B_ extends BloodGene
+  case object O_ extends BloodGene
+
+  sealed trait BloodType
+  case object A extends BloodType
+  case object B extends BloodType
+  case object AB extends BloodType
+  case object O extends BloodType
+
+  val bloodPrior: Distribution[(BloodGene, BloodGene)] = {
+    for {
+      g1 <- discreteUniform(List(A_, B_, O_))
+      g2 <- discreteUniform(List(A_, B_, O_))
+    } yield (g1, g2)
+  }
+
+  def typeFromGene(g: (BloodGene, BloodGene)): Distribution[BloodType] = {
+    g match {
+      case (A_, A_) => always(A)
+      case (A_, B_) => always(AB)
+      case (A_, O_) => always(A)
+      case (B_, A_) => always(AB)
+      case (B_, B_) => always(B)
+      case (B_, O_) => always(B)
+      case (O_, A_) => always(A)
+      case (O_, B_) => always(B)
+      case (O_, O_) => always(O)
+    }
+  }
+
+  def childFromParents(p1: (BloodGene, BloodGene), p2: (BloodGene, BloodGene)): Distribution[(BloodGene, BloodGene)] = {
+    val (p1a, p1b) = p1
+    val (p2a, p2b) = p2
+    discreteUniform(for {
+      p1 <- List(p1a, p1b)
+      p2 <- List(p2a, p2b)
+    } yield (p1, p2))
+  }
+
+  case class BloodTrial(bart: BloodType, lisa: BloodType, homer: BloodType, marge: BloodType, selma: BloodType)
+  val bloodType = for {
+    gHomer <- bloodPrior
+    bHomer <- typeFromGene(gHomer)
+    gHarry <- bloodPrior
+    gJackie <- bloodPrior
+    gSelma <- childFromParents(gHarry, gJackie)
+    bSelma <- typeFromGene(gSelma)
+    gMarge <- childFromParents(gHarry, gJackie)
+    bMarge <- typeFromGene(gMarge)
+    gBart <- childFromParents(gHomer, gMarge)
+    bBart <- typeFromGene(gBart)
+    gLisa <- childFromParents(gHomer, gMarge)
+    bLisa <- typeFromGene(gLisa)
+  } yield BloodTrial(bBart, bLisa, bHomer, bMarge, bSelma)
+
+  def runBloodType = bloodType.filter(_.selma == A).pr(_.bart == A)
 }
