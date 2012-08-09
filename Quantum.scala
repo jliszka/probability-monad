@@ -38,16 +38,16 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B]) 
   }
 
   // Measure a quantum state (or a part of one). Returns the result of the measurement and the new state.
-  def measure[A1](w: A => A1)(implicit frac: Fractional[B]): (A1, W[A, B]) = {
+  def measure[A1](w: A => A1 = identity[A] _)(implicit frac: Fractional[B]): (A1, W[A, B]) = {
     val r = rand.nextDouble()
-    def find(r: Double, s: List[(A1, Double)]): A1 = s match {
+    def find(r: Double, s: List[(A, Double)]): A = s match {
       case (l, p) :: Nil => l
       case (l, p) :: rest if r < p => l
       case (l, p) :: rest => find(r - p, rest)
       case Nil => throw new Exception("empty state")
     }
-    val squaredAmplitudes = this.map(w).state.toList.map{ case (a, b) => (a, num2.norm(b)) }
-    val measurement = find(r, squaredAmplitudes)
+    val squaredAmplitudes = this.state.toList.map{ case (a, b) => (a, num2.norm(b)) }
+    val measurement = w(find(r, squaredAmplitudes))
     val newState = this.filter(s => w(s) == measurement)
     (measurement, newState)
   }
@@ -61,7 +61,11 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B]) 
   }
 
   override def toString = {
-    state.filter{ case (a, b) => num2.norm(b) > 0.00001 }.map{ case (a, b) => b.toString + a.toString }.mkString(" ")
+    state
+      .filter{ case (a, b) => num2.norm(b) > 0.00001 }
+      .sortBy{ case (a, b) => a.toString }
+      .map{ case (a, b) => b.toString + a.toString }
+      .mkString(" + ")
   }
 }
 
@@ -146,7 +150,7 @@ object Gate {
     case S1 => s1.scale(-1)
   }
 
-  // Hadamard get
+  // Hadamard gate
   def H(b: Std): Q[Std] = b match {
     case S0 => plus
     case S1 => minus
@@ -159,6 +163,16 @@ object Gate {
     case T(S1, S0) => pure(T(S1, S1))
     case T(S1, S1) => pure(T(S1, S0))
   }
+
+  // Rotation gate
+  val tau = 2 * math.Pi
+  def rot(theta: Double)(b: Std): Q[Std] = b match {
+    case S0 => W(S0 -> math.cos(theta), S1 -> math.sin(theta))
+    case S1 => W(S0 -> -math.sin(theta), S1 -> math.cos(theta))
+  }
+
+  // Square root of NOT gate
+  val sqrtNot: U[Std] = rot(tau/8) _
 
   // Find the adjoint of a unitary transformation
   def adjoint[B](u: Std => Q[B])(b: B): Q[Std] = {
@@ -245,9 +259,41 @@ object Examples {
     bob >>= gate1 >>= gate2
   }
 
-  def runTeleport(alice: Q[Std]): Q[Std] = {
+  def runTeleport(alice: Q[Std]) {
+    println("Alice's state: " + alice.toString)
     val (bit1, bit2, bob) = teleport(alice)
-    receive(bit1, bit2, bob)
+    println("Outcome of measurements: " + bit1 + ", " + bit2)
+    println("Bob's state as a result of Alice's measurements: " + bob.toString)
+    val r = receive(bit1, bit2, bob)
+    println("Bob's state after applying gates: " + r.toString)
+  }
+
+  def runDecoherence {
+    val simple = s0 >>= sqrtNot
+    val entangled = bell
+
+    println()
+    println("** Without decoherence **")
+    println("initial: " + simple.toString)
+    val r1 = simple >>= sqrtNot
+    println("rotate qubit: " + r1.toString)
+    println("measure qubit: " + r1.measure()._1)
+    println("measure qubit: " + r1.measure()._1)
+    println("measure qubit: " + r1.measure()._1)
+    println("measure qubit: " + r1.measure()._1)
+
+    println()
+    println("** With decoherence (entangled) **")
+    println("initial: " + entangled.toString)
+    val r2 = entangled >>= lift1(sqrtNot)
+    println("rotate 1st qubit: " + r2.toString)
+    println("measure 1st qubit: " + r2.measure(_._1)._1)
+    println("measure 1st qubit: " + r2.measure(_._1)._1)
+    println("measure 1st qubit: " + r2.measure(_._1)._1)
+    println("measure 1st qubit: " + r2.measure(_._1)._1)
+
+    println()
+    println("Entangled qubit behaves like a classical random bit!")
   }
 }
 
