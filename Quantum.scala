@@ -111,6 +111,9 @@ object Basis {
   case object S_+ extends Sign("+")
   case object S_- extends Sign("-")
 
+  val s_+ = pure(S_+)
+  val s_- = pure(S_-)
+
   // Tensor product of two bases, e.g., T[Std, Std] = { |00>, |01>, |10>, |11> }
   case class T[+B1 <: Basis, +B2 <: Basis](_1: B1, _2: B2) extends Basis(_1.label + _2.label)
 }
@@ -122,39 +125,42 @@ object Gate {
   // A unitary transformation (a quantum gate)
   type U[B <: Basis] = B => Q[B]
 
+  // Identity gate
   def I[B <: Basis](b: B): Q[B] = pure(b)
 
-  def toSign(l: Std): Q[Sign] = l match {
+  // Reinterpret any state in the Sign basis
+  def toSign(b: Std): Q[Sign] = b match {
     case S0 => W(S_+ -> rhalf, S_- -> rhalf)
     case S1 => W(S_+ -> rhalf, S_- -> rhalf * -1)
   }
 
   // Not gate
-  def X(l: Std): Q[Std] = l match {
+  def X(b: Std): Q[Std] = b match {
     case S0 => s1
     case S1 => s0
   }
 
   // Phase flip gate
-  def Z(l: Std): Q[Std] = l match {
+  def Z(b: Std): Q[Std] = b match {
     case S0 => s0
     case S1 => s1.scale(-1)
   }
 
   // Hadamard get
-  def H(l: Std): Q[Std] = l match {
+  def H(b: Std): Q[Std] = b match {
     case S0 => plus
     case S1 => minus
   }
 
   // Controlled not (CNOT) gate
-  def cnot(s: T[Std, Std]): Q[T[Std, Std]] = s match {
+  def cnot(b: T[Std, Std]): Q[T[Std, Std]] = b match {
     case T(S0, S0) => pure(T(S0, S0))
     case T(S0, S1) => pure(T(S0, S1))
     case T(S1, S0) => pure(T(S1, S1))
     case T(S1, S1) => pure(T(S1, S0))
   }
 
+  // Find the adjoint of a unitary transformation
   def adjoint[B](u: Std => Q[B])(b: B): Q[Std] = {
     W(S0 -> u(S0)(b).conj, S1 -> u(S1)(b).conj)
   }
@@ -174,34 +180,34 @@ object Gate {
     } yield T(x, y)
   }
 
-  // Lifts 2 gates into a tensor product
+  // Lift 2 gates into a tensor product
   def lift12[B1 <: Basis, B1a <: Basis, B2 <: Basis, B2a <: Basis](t1: B1 => Q[B1a], t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1a, B2a]] = {
     tensor(t1(s._1), t2(s._2))
   }
 
-  // Lifts a gate into the left side of a tensor product
+  // Lift a gate into the left side of a tensor product
   def lift1[B1 <: Basis, B1a <: Basis, B2 <: Basis](t1: B1 => Q[B1a])(s: T[B1, B2]): Q[T[B1a, B2]] = {
     tensor(t1(s._1), pure(s._2))
   }
 
-  // Lifts a gate into the right side of a tensor product
+  // Lift a gate into the right side of a tensor product
   def lift2[B1 <: Basis, B2 <: Basis, B2a <: Basis](t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1, B2a]] = {
     tensor(pure(s._1), t2(s._2))
   }
 
   val toSign12 = lift12(toSign, toSign) _
 
-  // Re-associates a nested tensor product
+  // Re-associate a nested tensor product
   def assoc1[B1 <: Basis, B2 <: Basis, B3 <: Basis](b: T[B1, T[B2, B3]]): Q[T[T[B1, B2], B3]] = {
     b match { case T(b1, T(b2, b3)) => pure(T(T(b1, b2), b3)) }
   }
 
-  // Re-associates a nested tensor product the other way
+  // Re-associate a nested tensor product the other way
   def assoc2[B1 <: Basis, B2 <: Basis, B3 <: Basis](b: T[T[B1, B2], B3]): Q[T[B1, T[B2, B3]]] = {
     b match { case T(T(b1, b2), b3) => pure(T(b1, T(b2, b3))) }
   }
   
-  // Flips the two sides of tensor product
+  // Flip the two sides of tensor product
   def flip[B1 <: Basis, B2 <: Basis](b: T[B1, B2]): Q[T[B2, B1]] = {
     b match { case T(b1, b2) => pure(T(b2, b1)) }
   }
