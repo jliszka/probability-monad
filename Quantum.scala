@@ -1,5 +1,3 @@
-import Complex._
-
 case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B]) {
   private val rand = new scala.util.Random()
   import num._
@@ -26,6 +24,7 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B]) 
   def scale(x: Double) = {
     W(state.map{ case (a, b) => (a, num2.scale(b, x)) }: _*)
   }
+  def unary_- = this.scale(-1.0)
 
   def filter(f: A => Boolean)(implicit num: Fractional[B]): W[A, B] = {
     W(state.filter{ case (a, b) => f(a) }: _*).normalize
@@ -37,7 +36,7 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B]) 
     this.scale(1 / total)
   }
 
-  // Measure a quantum state (or a part of one). Returns the result of the measurement and the new state.
+  // Measure a quantum state (or a part of one). Returns the outcome of the measurement and the new state.
   def measure[A1](w: A => A1 = identity[A] _)(implicit frac: Fractional[B]): (A1, W[A, B]) = {
     val r = rand.nextDouble()
     def find(r: Double, s: List[(A, Double)]): A = s match {
@@ -47,9 +46,9 @@ case class W[A, B](state: (A, B)*)(implicit num: Numeric[B], num2: Numeric2[B]) 
       case Nil => throw new Exception("empty state")
     }
     val squaredAmplitudes = this.state.toList.map{ case (a, b) => (a, num2.norm(b)) }
-    val measurement = w(find(r, squaredAmplitudes))
-    val newState = this.filter(s => w(s) == measurement)
-    (measurement, newState)
+    val outcome = w(find(r, squaredAmplitudes))
+    val newState = this.filter(s => w(s) == outcome)
+    (outcome, newState)
   }
 
   def inner(other: W[A, B]) {
@@ -75,7 +74,7 @@ class WIsNumeric[A, B](implicit num: Numeric[B], num2: Numeric2[B]) extends Nume
   override def fromInt(x: Int) = ???
   override def plus(x: W[A, B], y: W[A, B]) = W(x.state ++ y.state :_*).collect
   override def minus(x: W[A, B], y: W[A, B]) = plus(x, negate(y))
-  override def negate(x: W[A, B]) = x.scale(-1)
+  override def negate(x: W[A, B]) = -x
   override def times(x: W[A, B], y: W[A, B]) = ???
   override def toDouble(x: W[A, B]) = ???
   override def toFloat(x: W[A, B]) = ???
@@ -83,17 +82,16 @@ class WIsNumeric[A, B](implicit num: Numeric[B], num2: Numeric2[B]) extends Nume
   override def toLong(x: W[A, B]) = ???
 }
 
-type Q[A] = W[A, Complex]
-
 object W {
+  type Q[A] = W[A, Complex]
   implicit def wIsNumeric[A, B: Numeric: Numeric2]: WIsNumeric[A, B] = new WIsNumeric[A, B]
   val rhalf: Complex = math.sqrt(0.5)
   val rquarter: Complex = math.sqrt(0.75)
-  def apply[A, B: Numeric: Numeric2](state: (A, B)*) = new W(state: _*)
-  def pure[A](a: A): Q[A] = W(a -> one)
+  def pure[A](a: A): Q[A] = new W(a -> Complex.one)
 }
 
-class Basis(val label: String) {
+abstract class Basis[+B <: Basis[B]](val label: String, vs: B*) {
+  def vectors: List[B] = vs.toList
   override def toString = "|"+label+">"
 }
 
@@ -101,17 +99,17 @@ object Basis {
   import W._
 
   // Standard basis { |0>, |1> }
-  sealed abstract class Std(label: String) extends Basis(label)
+  sealed abstract class Std(label: String) extends Basis[Std](label, S0, S1)
   case object S0 extends Std("0")
   case object S1 extends Std("1")
 
   val s0: Q[Std] = pure(S0)
   val s1: Q[Std] = pure(S1)
   val plus: Q[Std] = W(S0 -> rhalf, S1 -> rhalf)
-  val minus: Q[Std] = W(S0 -> rhalf, S1 -> rhalf * -1)
+  val minus: Q[Std] = W(S0 -> rhalf, S1 -> -rhalf)
 
   // Sign basis { |+>, |-> }
-  sealed abstract class Sign(label: String) extends Basis(label)
+  sealed abstract class Sign(label: String) extends Basis[Sign](label, S_+, S_-)
   case object S_+ extends Sign("+")
   case object S_- extends Sign("-")
 
@@ -119,23 +117,40 @@ object Basis {
   val s_- = pure(S_-)
 
   // Tensor product of two bases, e.g., T[Std, Std] = { |00>, |01>, |10>, |11> }
-  case class T[+B1 <: Basis, +B2 <: Basis](_1: B1, _2: B2) extends Basis(_1.label + _2.label)
+  case class T[+B1 <: Basis[B1], +B2 <: Basis[B2]](_1: B1, _2: B2) extends Basis[T[B1, B2]](_1.label + _2.label) {
+    override def vectors = {
+      for {
+	b1 <- _1.vectors
+	b2 <- _2.vectors
+      } yield T(b1, b2)
+    }
+  }
 }
 
+
 object Gate {
-  import W.{pure, rhalf}
+  import W.{pure, rhalf, Q}
   import Basis._
   
   // A unitary transformation (a quantum gate)
-  type U[B <: Basis] = B => Q[B]
+  type U[B <: Basis[B]] = B => Q[B]
 
   // Identity gate
-  def I[B <: Basis](b: B): Q[B] = pure(b)
+  def I[B <: Basis[B]](b: B): Q[B] = pure(b)
 
   // Reinterpret any state in the Sign basis
   def toSign(b: Std): Q[Sign] = b match {
     case S0 => W(S_+ -> rhalf, S_- -> rhalf)
-    case S1 => W(S_+ -> rhalf, S_- -> rhalf * -1)
+    case S1 => W(S_+ -> rhalf, S_- -> -rhalf)
+  }
+
+  def fromBasis[B <: Basis[B]](to: Std => Q[B])(s: B): Q[Std] = {
+    val basis = List(S0, S1)
+    W(basis.map(b => b -> to(b)(s).conj): _*)    
+  }
+
+  def fromSign(b: Sign): Q[Std] = {
+    fromBasis(toSign)(b)
   }
 
   // Not gate
@@ -147,7 +162,7 @@ object Gate {
   // Phase flip gate
   def Z(b: Std): Q[Std] = b match {
     case S0 => s0
-    case S1 => s1.scale(-1)
+    case S1 => -s1
   }
 
   // Hadamard gate
@@ -158,10 +173,10 @@ object Gate {
 
   // Controlled not (CNOT) gate
   def cnot(b: T[Std, Std]): Q[T[Std, Std]] = b match {
-    case T(S0, S0) => pure(T(S0, S0))
-    case T(S0, S1) => pure(T(S0, S1))
-    case T(S1, S0) => pure(T(S1, S1))
-    case T(S1, S1) => pure(T(S1, S0))
+    case T(S0, S0) => tensor(s0, s0)
+    case T(S0, S1) => tensor(s0, s1)
+    case T(S1, S0) => tensor(s1, s1)
+    case T(S1, S1) => tensor(s1, s0)
   }
 
   // Rotation gate
@@ -174,20 +189,29 @@ object Gate {
   // Square root of NOT gate
   val sqrtNot: U[Std] = rot(tau/8) _
 
-  // Find the adjoint of a unitary transformation
-  def adjoint[B](u: Std => Q[B])(b: B): Q[Std] = {
-    W(S0 -> u(S0)(b).conj, S1 -> u(S1)(b).conj)
+
+  // Find the eigenvalues of an unitary operator
+  def eigen(u: U[Std]) = {
+    def solve(a: Complex, b: Complex, c: Complex): (Complex, Complex) = {
+      val det = (b*b - 4*a*c)^(0.5)
+      ((-b + det) / (2*a), (-b - det) / (2*a))
+    }
+    val a = u(S0)(S0)
+    val b = u(S1)(S0)
+    val c = u(S0)(S1)
+    val d = u(S1)(S1)
+    val (e1, e2) = solve(1, -(a+d), a*d - b*c)
+    (e1, e2)
   }
 
-  def adjoint2(u: T[Std, Std] => Q[T[Std, Std]])(s: T[Std, Std]): Q[T[Std, Std]] = {
-    val basis = List(T(S0, S0), T(S0, S1), T(S1, S0), T(S1, S1))
+  // Find the adjoint of a unitary transformation
+  def adjoint[B <: Basis[B]](u: B => Q[B])(s: B): Q[B] = {
+    val basis = s.vectors
     W(basis.map(b => b -> u(b)(s).conj): _*)
   }
 
-  val fromSign = adjoint(toSign) _
-
   // Tensor product of two quantum states
-  def tensor[B1 <: Basis, B2 <: Basis](a: Q[B1], b: Q[B2]): Q[T[B1, B2]] = {
+  def tensor[B1 <: Basis[B1], B2 <: Basis[B2]](a: Q[B1], b: Q[B2]): Q[T[B1, B2]] = {
     for {
       x <- a
       y <- b
@@ -195,39 +219,40 @@ object Gate {
   }
 
   // Lift 2 gates into a tensor product
-  def lift12[B1 <: Basis, B1a <: Basis, B2 <: Basis, B2a <: Basis](t1: B1 => Q[B1a], t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1a, B2a]] = {
+  def lift12[B1 <: Basis[B1], B1a <: Basis[B1a], B2 <: Basis[B2], B2a <: Basis[B2a]](t1: B1 => Q[B1a], t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1a, B2a]] = {
     tensor(t1(s._1), t2(s._2))
   }
 
   // Lift a gate into the left side of a tensor product
-  def lift1[B1 <: Basis, B1a <: Basis, B2 <: Basis](t1: B1 => Q[B1a])(s: T[B1, B2]): Q[T[B1a, B2]] = {
+  def lift1[B1 <: Basis[B1], B1a <: Basis[B1a], B2 <: Basis[B2]](t1: B1 => Q[B1a])(s: T[B1, B2]): Q[T[B1a, B2]] = {
     tensor(t1(s._1), pure(s._2))
   }
 
   // Lift a gate into the right side of a tensor product
-  def lift2[B1 <: Basis, B2 <: Basis, B2a <: Basis](t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1, B2a]] = {
+  def lift2[B1 <: Basis[B1], B2 <: Basis[B2], B2a <: Basis[B2a]](t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1, B2a]] = {
     tensor(pure(s._1), t2(s._2))
   }
 
   val toSign12 = lift12(toSign, toSign) _
 
   // Re-associate a nested tensor product
-  def assoc1[B1 <: Basis, B2 <: Basis, B3 <: Basis](b: T[B1, T[B2, B3]]): Q[T[T[B1, B2], B3]] = {
+  def assoc1[B1 <: Basis[B1], B2 <: Basis[B2], B3 <: Basis[B3]](b: T[B1, T[B2, B3]]): Q[T[T[B1, B2], B3]] = {
     b match { case T(b1, T(b2, b3)) => pure(T(T(b1, b2), b3)) }
   }
 
   // Re-associate a nested tensor product the other way
-  def assoc2[B1 <: Basis, B2 <: Basis, B3 <: Basis](b: T[T[B1, B2], B3]): Q[T[B1, T[B2, B3]]] = {
+  def assoc2[B1 <: Basis[B1], B2 <: Basis[B2], B3 <: Basis[B3]](b: T[T[B1, B2], B3]): Q[T[B1, T[B2, B3]]] = {
     b match { case T(T(b1, b2), b3) => pure(T(b1, T(b2, b3))) }
   }
   
   // Flip the two sides of tensor product
-  def flip[B1 <: Basis, B2 <: Basis](b: T[B1, B2]): Q[T[B2, B1]] = {
+  def flip[B1 <: Basis[B1], B2 <: Basis[B2]](b: T[B1, B2]): Q[T[B2, B1]] = {
     b match { case T(b1, b2) => pure(T(b2, b1)) }
   }
 }
 
 object Examples {
+  import Complex._
   import W._
   import Basis._
   import Gate._
@@ -239,11 +264,14 @@ object Examples {
   val state1: Q[Std] = W(S0 -> 0.6, S1 -> 0.8.i)
   val state2: Q[Std] = W(S0 -> -0.5, S1 -> rquarter)
 
-  val bell: Q[T[Std, Std]] = W(T(S0, S0) -> rhalf, T(S1, S1) -> rhalf)
-  val bell2: Q[T[Std, Std]] = W(T(S0, S1) -> rhalf, T(S1, S0) -> rhalf * -1)
-  def bell3(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= lift1(H) >>= cnot
-  def bell4(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= cnot >>= lift1(H)
-  val bell5 = adjoint2(bell3) _
+  def mkBell(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= lift1(H) >>= cnot
+  def mkBell2(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= cnot >>= lift1(H)
+  val mkBell3 = adjoint(mkBell) _
+  val bell: Q[T[Std, Std]] = mkBell(T[Std, Std](S0, S0))
+  val bell2: Q[T[Std, Std]] = mkBell(T[Std, Std](S0, S1))
+
+
+  def runSqrtNot = s0 >>= sqrtNot >>= sqrtNot
 
   def teleport(alice: Q[Std]): (Boolean, Boolean, Q[Std]) = {
     val r = tensor(alice, bell) >>= assoc1 >>= lift1(cnot) >>= lift1(lift1(toSign))
@@ -296,8 +324,3 @@ object Examples {
     println("Entangled qubit behaves like a classical random bit!")
   }
 }
-
-import Basis._
-import Gate._
-import Examples._
-
