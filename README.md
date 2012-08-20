@@ -7,7 +7,8 @@ biased coin with equal probability. If you flip it 5 times and it comes up heads
 probability you have the fair coin?
 
     case class Trial(haveFairCoin: Boolean, flips: List[Coin])
-    def bayesianCoin(nflips: Int): Distribution[(Int, List[Coin])] = {
+
+    def bayesianCoin(nflips: Int): Distribution[Trial] = {
       for {
         haveFairCoin <- tf()
         c = if (haveFairCoin) coin else biasedCoin(0.9)
@@ -27,6 +28,25 @@ exactly 30?
     }
 
     dieSum(30).pr(_ contains 30)
+
+Or: Each family has children until it has a boy, and then stops. What is the expected fraction of of girls in the population?
+
+    sealed abstract class Child
+    case object Boy extends Child
+    case object Girl extends Child
+
+    def family = {
+      discreteUniform(List(Boy, Girl)).until(_ contains Boy)
+    }
+
+    def population(families: Int) = {
+      for {
+        children <- family.repeat(families).map(_.flatten)
+        val girls = children.count(_ == Girl)
+      } yield 1.0 * girls / children.length
+    }
+
+    population(4).ev
 
 [Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains code
 for creating and manipulating probability distributions. Built-in distributions include:
@@ -57,7 +77,8 @@ example uses, and possibly a RISK simulator.
 
 This code is mostly cribbed off of [sigfpe's vector space monad](http://sigfpe.wordpress.com/2007/03/04/monads-vector-spaces-and-quantum-mechanics-pt-ii/). I'm following along in the [Quantum Mechanics and Quantum Computation](https://class.coursera.org/qcomp-2012-001/class/index) coursera class and coding up some of the examples.
 
-    $ scala -i Complex.scala Quantum.scala
+    $ scalac Complex.scala Quantum.scala
+    $ scala -cp . -Yrepl-sync -i boot.scala
 
 Try out some of the examples in the Examples object.
 
