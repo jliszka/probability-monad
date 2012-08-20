@@ -98,7 +98,7 @@ object Examples {
 
   /**
    * Each family has children until it has a boy, and then stops. What
-   * is the expected fraction of of girls in the population?
+   * is the expected fraction of girls in the population?
    */ 
   
   sealed abstract class Child

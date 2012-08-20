@@ -29,7 +29,7 @@ exactly 30?
 
     dieSum(30).pr(_ contains 30)
 
-Or: Each family has children until it has a boy, and then stops. What is the expected fraction of of girls in the population?
+Or: Each family has children until it has a boy, and then stops. What is the expected fraction of girls in the population?
 
     sealed abstract class Child
     case object Boy extends Child
