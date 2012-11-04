@@ -90,16 +90,60 @@ object W {
   def pure[A](a: A): Q[A] = new W(a -> Complex.one)
 }
 
-abstract class Basis[+B <: Basis[B]](val label: String, vs: B*) {
-  def vectors: List[B] = vs.toList
+abstract class Basis(val label: String) {
   override def toString = "|"+label+">"
+}
+
+trait Convertable[B1 <: Basis, B2 <: Basis] {
+  def convert(b: B1): W.Q[B2]
+}
+
+trait Enumerable[B <: Basis] {
+  def vectors: List[B]
+}
+
+object Enumerable {
+  import Basis._
+  implicit object StdIsEnumerable extends Enumerable[Std] {
+    override val vectors = List(S0, S1)
+  }
+}
+
+object Convertable {
+  import W._
+  import Basis._
+
+  implicit object SignIsConvertable extends Convertable[Std, Sign] {
+    def convert(b: Std): Q[Sign] = b match {
+      case S0 => W(S_+ -> rhalf, S_- -> rhalf)
+      case S1 => W(S_+ -> rhalf, S_- -> -rhalf)
+    }
+  }
+
+  implicit def id[B <: Basis]: Convertable[B, B] = new Convertable[B, B] {
+    override def convert(b: B): Q[B] = pure(b)
+  }
+
+  implicit def sym[B1 <: Basis, B2 <: Basis](implicit from: Convertable[B2, B1], enum: Enumerable[B2]): Convertable[B1, B2] = new Convertable[B1, B2] {
+    override def convert(b1: B1): Q[B2] = {
+      W(enum.vectors.map(b2 => b2 -> from.convert(b2)(b1).conj): _*)
+    }
+  }
+
+/*
+  implicit def trans[B1 <: Basis, B2 <: Basis, B3 <: Basis](implicit c12: Convertable[B1, B2], c23: Convertable[B2, B3]): Convertable[B1, B3] = new Convertable[B1, B3] {
+    override def convert(b1: B1): Q[B3] = pure(b1) >>= c12.convert >>= c23.convert
+  }
+*/
+
+  def convert[B1 <: Basis, B2 <: Basis](implicit c: Convertable[B1, B2]): B1 => Q[B2] = c.convert _
 }
 
 object Basis {
   import W._
 
   // Standard basis { |0>, |1> }
-  sealed abstract class Std(label: String) extends Basis[Std](label, S0, S1)
+  abstract sealed class Std(label: String) extends Basis(label)
   case object S0 extends Std("0")
   case object S1 extends Std("1")
 
@@ -109,7 +153,7 @@ object Basis {
   val minus: Q[Std] = W(S0 -> rhalf, S1 -> -rhalf)
 
   // Sign basis { |+>, |-> }
-  sealed abstract class Sign(label: String) extends Basis[Sign](label, S_+, S_-)
+  abstract sealed class Sign(label: String) extends Basis(label)
   case object S_+ extends Sign("+")
   case object S_- extends Sign("-")
 
@@ -117,41 +161,64 @@ object Basis {
   val s_- = pure(S_-)
 
   // Tensor product of two bases, e.g., T[Std, Std] = { |00>, |01>, |10>, |11> }
-  case class T[+B1 <: Basis[B1], +B2 <: Basis[B2]](_1: B1, _2: B2) extends Basis[T[B1, B2]](_1.label + _2.label) {
-    override def vectors = {
-      for {
-	b1 <- _1.vectors
-	b2 <- _2.vectors
-      } yield T(b1, b2)
+  case class T[+B1 <: Basis, +B2 <: Basis](_1: B1, _2: B2) extends Basis(_1.label + _2.label)
+
+  object T {
+    implicit def TIsConvertable[B1 <: Basis, B2 <: Basis, B3 <: Basis, B4 <: Basis](implicit c1: Convertable[B1, B3], c2: Convertable[B2, B4]): Convertable[T[B1, B2], T[B3, B4]] = new Convertable[T[B1, B2], T[B3, B4]] {
+      def convert(b: T[B1, B2]) = pure(b) >>= Gate.lift12(c1.convert, c2.convert)
+      }
+    
+    implicit def TIsEnumerable[B1 <: Basis, B2 <: Basis](implicit e1: Enumerable[B1], e2: Enumerable[B2]): Enumerable[T[B1, B2]] = new Enumerable[T[B1, B2]] {
+      override val vectors = {
+	for {
+	  b1 <- e1.vectors
+	  b2 <- e2.vectors
+	} yield T(b1, b2)
+      }
+    }
+  }
+
+  case class L[B <: Basis](ls: List[B]) extends Basis(ls.map(_.label).mkString) {
+    val n = ls.length
+    val N = math.pow(2, n).toInt
+    def splitAt(n: Int) = {
+      val (a, b) = ls.splitAt(n)
+      (L(a), L(b))
+    }
+  }
+
+  object L {
+
+    def fromInt(i: Int, width: Int): L[Std] = {
+      def helper(i: Int, width: Int, acc: List[Std]): List[Std] = {
+	if (width == 0) acc
+	else helper(i / 2, width-1, (if (i % 2 == 0) S0 else S1) :: acc)
+      }
+      new L(helper(i, width, Nil))
+    }
+
+    def toInt(s: L[Std]): Int = {
+      def helper(ls: List[Std], acc: Int): Int = {
+	ls match {
+	  case Nil => acc
+	  case S0 :: rest => helper(rest, acc * 2)
+	  case S1 :: rest => helper(rest, acc * 2 + 1)
+	}
+      }
+      helper(s.ls, 0)
     }
   }
 }
-
 
 object Gate {
   import W.{pure, rhalf, Q}
   import Basis._
   
   // A unitary transformation (a quantum gate)
-  type U[B <: Basis[B]] = B => Q[B]
+  type U[B <: Basis] = B => Q[B]
 
   // Identity gate
-  def I[B <: Basis[B]](b: B): Q[B] = pure(b)
-
-  // Reinterpret any state in the Sign basis
-  def toSign(b: Std): Q[Sign] = b match {
-    case S0 => W(S_+ -> rhalf, S_- -> rhalf)
-    case S1 => W(S_+ -> rhalf, S_- -> -rhalf)
-  }
-
-  def fromBasis[B <: Basis[B]](to: Std => Q[B])(s: B): Q[Std] = {
-    val basis = List(S0, S1)
-    W(basis.map(b => b -> to(b)(s).conj): _*)    
-  }
-
-  def fromSign(b: Sign): Q[Std] = {
-    fromBasis(toSign)(b)
-  }
+  def I[B <: Basis](b: B): Q[B] = pure(b)
 
   // Not gate
   def X(b: Std): Q[Std] = b match {
@@ -189,6 +256,20 @@ object Gate {
   // Square root of NOT gate
   val sqrtNot: U[Std] = rot(tau/8) _
 
+  // Implementation of f(x) as a quantum gate
+  def U(f: Int => Int, width: Int)(s: L[Std]): Q[L[Std]] = {
+    val (in, out) = s.ls.splitAt(width)
+    val fx = L.fromInt(f(L.toInt(L(in))) ^ L.toInt(L(out)), out.length)
+    tensorLL(pure(L(in)), pure(fx))
+  }
+
+  // Quantum Fourier Transform
+  // correct, but should be implemented in terms of smaller instances of QFT and basic gates
+  def QFT(b: L[Std]): Q[L[Std]] = {
+    val w = Complex.polar(1.0, tau / b.N)
+    val base = w ^ L.toInt(b)
+    W((0 until b.N).map(i => L.fromInt(i, b.n) -> (base ^ i)): _*).normalize
+  }
 
   // Find the eigenvalues of an unitary operator
   def eigen(u: U[Std]) = {
@@ -205,48 +286,76 @@ object Gate {
   }
 
   // Find the adjoint of a unitary transformation
-  def adjoint[B <: Basis[B]](u: B => Q[B])(s: B): Q[B] = {
-    val basis = s.vectors
-    W(basis.map(b => b -> u(b)(s).conj): _*)
+  def adjoint[B1 <: Basis, B2 <: Basis, B3 <: Basis](u: B1 => Q[B2])(implicit c31: Convertable[B3, B1], c23: Convertable[B2, B3], e3: Enumerable[B3]): B2 => Q[B1] = {
+    def adjointEnum(u: B3 => Q[B3])(b3: B3): Q[B3] = {
+      val basis = e3.vectors
+      W(basis.map(b => b -> u(b)(b3).conj): _*)
+    }
+    (b2: B2) => pure(b2) >>= c23.convert >>= adjointEnum({ (b3: B3) => pure(b3) >>= c31.convert >>= u >>= c23.convert }) >>= c31.convert
   }
 
   // Tensor product of two quantum states
-  def tensor[B1 <: Basis[B1], B2 <: Basis[B2]](a: Q[B1], b: Q[B2]): Q[T[B1, B2]] = {
+  def tensor[B1 <: Basis, B2 <: Basis](a: Q[B1], b: Q[B2]): Q[T[B1, B2]] = {
     for {
       x <- a
       y <- b
     } yield T(x, y)
   }
 
+  def tensorL[B <: Basis](a: Q[B], b: Q[L[B]]): Q[L[B]] = {
+    for {
+      x <- a
+      y <- b
+    } yield L(x :: y.ls)
+  }
+
+  def tensorLL[B <: Basis](a: Q[L[B]], b: Q[L[B]]): Q[L[B]] = {
+    for {
+      x <- a
+      y <- b
+    } yield L(x.ls ++ y.ls)
+  }
+
   // Lift 2 gates into a tensor product
-  def lift12[B1 <: Basis[B1], B1a <: Basis[B1a], B2 <: Basis[B2], B2a <: Basis[B2a]](t1: B1 => Q[B1a], t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1a, B2a]] = {
+  def lift12[B1 <: Basis, B1a <: Basis, B2 <: Basis, B2a <: Basis](t1: B1 => Q[B1a], t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1a, B2a]] = {
     tensor(t1(s._1), t2(s._2))
   }
 
   // Lift a gate into the left side of a tensor product
-  def lift1[B1 <: Basis[B1], B1a <: Basis[B1a], B2 <: Basis[B2]](t1: B1 => Q[B1a])(s: T[B1, B2]): Q[T[B1a, B2]] = {
+  def lift1[B1 <: Basis, B1a <: Basis, B2 <: Basis](t1: B1 => Q[B1a])(s: T[B1, B2]): Q[T[B1a, B2]] = {
     tensor(t1(s._1), pure(s._2))
   }
 
   // Lift a gate into the right side of a tensor product
-  def lift2[B1 <: Basis[B1], B2 <: Basis[B2], B2a <: Basis[B2a]](t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1, B2a]] = {
+  def lift2[B1 <: Basis, B2 <: Basis, B2a <: Basis](t2: B2 => Q[B2a])(s: T[B1, B2]): Q[T[B1, B2a]] = {
     tensor(pure(s._1), t2(s._2))
   }
 
-  val toSign12 = lift12(toSign, toSign) _
+  def liftL[B1 <: Basis, B2 <: Basis](t: B1 => Q[B2])(s: L[B1]): Q[L[B2]] = {
+    s match {
+      case L(Nil) => pure(L(Nil))
+      case L(s0 :: rest) => tensorL(t(s0), liftL(t)(L(rest)))
+    }
+  }
+
+  def liftSlice[B <: Basis](t: L[B] => Q[L[B]], start: Int, len: Int)(s: L[B]): Q[L[B]] = {
+    val (pre, rest) = s.ls.splitAt(start)
+    val (mid, post) = rest.splitAt(len)
+    tensorLL(tensorLL(pure(L(pre)), t(L(mid))), pure(L(post)))
+  }
 
   // Re-associate a nested tensor product
-  def assoc1[B1 <: Basis[B1], B2 <: Basis[B2], B3 <: Basis[B3]](b: T[B1, T[B2, B3]]): Q[T[T[B1, B2], B3]] = {
+  def assoc1[B1 <: Basis, B2 <: Basis, B3 <: Basis](b: T[B1, T[B2, B3]]): Q[T[T[B1, B2], B3]] = {
     b match { case T(b1, T(b2, b3)) => pure(T(T(b1, b2), b3)) }
   }
 
   // Re-associate a nested tensor product the other way
-  def assoc2[B1 <: Basis[B1], B2 <: Basis[B2], B3 <: Basis[B3]](b: T[T[B1, B2], B3]): Q[T[B1, T[B2, B3]]] = {
+  def assoc2[B1 <: Basis, B2 <: Basis, B3 <: Basis](b: T[T[B1, B2], B3]): Q[T[B1, T[B2, B3]]] = {
     b match { case T(T(b1, b2), b3) => pure(T(b1, T(b2, b3))) }
   }
   
   // Flip the two sides of tensor product
-  def flip[B1 <: Basis[B1], B2 <: Basis[B2]](b: T[B1, B2]): Q[T[B2, B1]] = {
+  def flip[B1 <: Basis, B2 <: Basis](b: T[B1, B2]): Q[T[B2, B1]] = {
     b match { case T(b1, b2) => pure(T(b2, b1)) }
   }
 }
@@ -256,6 +365,7 @@ object Examples {
   import W._
   import Basis._
   import Gate._
+  import Convertable._
 
   def HZH(s: Q[Std]): Q[Std] = s >>= H >>= Z >>= H
   def runHZHequalsX(s: Q[Std]): (Q[Std], Q[Std]) = (HZH(s), s >>= X)
@@ -266,15 +376,15 @@ object Examples {
 
   def mkBell(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= lift1(H) >>= cnot
   def mkBell2(s: T[Std, Std]): Q[T[Std, Std]] = pure(s) >>= cnot >>= lift1(H)
-  val mkBell3 = adjoint(mkBell) _
-  val bell: Q[T[Std, Std]] = mkBell(T[Std, Std](S0, S0))
-  val bell2: Q[T[Std, Std]] = mkBell(T[Std, Std](S0, S1))
+  val mkBell3: U[T[Std, Std]] = adjoint(mkBell) _
+  val bell: Q[T[Std, Std]] = mkBell(T(S0, S0))
+  val bell2: Q[T[Std, Std]] = mkBell(T(S0, S1))
 
 
   def runSqrtNot = s0 >>= sqrtNot >>= sqrtNot
 
   def teleport(alice: Q[Std]): (Boolean, Boolean, Q[Std]) = {
-    val r = tensor(alice, bell) >>= assoc1 >>= lift1(cnot) >>= lift1(lift1(toSign))
+    val r = tensor(alice, bell) >>= assoc1 >>= lift1(cnot) >>= lift1(lift1(convert[Std, Sign]))
     val (m, newState) = r.measure(_._1)
     val bit1 = m._2 == S0
     val bit2 = m._1 == S_+
@@ -322,5 +432,46 @@ object Examples {
 
     println()
     println("Entangled qubit behaves like a classical random bit!")
+  }
+
+  /**
+   * Grover's algorithm
+   */
+  def grover(f: Int => Int, width: Int) = {
+    val Hn = liftSlice(liftL(H), 0, width) _
+    val minusL = pure(L.fromInt(1, 1)) >>= liftL(H)
+    val init = tensorLL(pure(L.fromInt(0, width)), minusL) >>= Hn
+    val inv = U(f, width) _
+    def g(x: Int): Int = if (x == 0) 0 else 1
+    def refl(s: L[Std]) = pure(s) >>= Hn >>= U(g, width) >>= Hn
+
+    (0 to (math.pow(2, width / 2 + 1)).toInt).foldLeft(init){ case (s, _) => s >>= inv >>= refl }
+  }
+  def runGrover = {
+    def f(x: Int) = if (x == 14) 1 else 0
+    val s = grover(f, 4)
+    println("final state: " + s.toString)
+    val m = L.toInt(s.measure(_.splitAt(4)._1)._1)
+    println("measurement: " + m)
+  }
+
+  /**
+   * Shor's quantum factorization algorithm (TODO)
+   */
+  def findPeriod(f: Int => Int, width: Int) = {
+    def trial = {
+      val s1 = pure(L.fromInt(0, width * 2)) >>= liftSlice(QFT, 0, width) >>= U(f, width) >>= liftSlice(QFT, 0, width)
+      L.toInt(s1.measure(_.splitAt(width)._1)._1)
+    }
+    def gcd(a: Int, b: Int): Int = {
+      if (b == 0) a
+      else gcd(b, a % b)
+    }
+    val r = List.fill(30)(trial).reduceLeft(gcd)
+    math.pow(2, width).toInt / r
+  }
+  def runFindPeriod = {
+    def f(x: Int) = x % 4 + 1
+    findPeriod(f, 5)
   }
 }
