@@ -341,4 +341,81 @@ object Examples {
   } yield BloodTrial(bBart, bLisa, bHomer, bMarge, bSelma)
 
   def runBloodType = bloodType.filter(_.selma == A).pr(_.bart == A)
+
+  /**
+   * Teasing apart correlation and causality.
+   * From http://www.michaelnielsen.org/ddi/if-correlation-doesnt-imply-causation-then-what-does/
+   *
+   * First, observe the joint probability distribution of:
+   *  - whether someone smokes
+   *  - whether someone has tar in their lungs
+   *  - whether someone gets cancer
+   *
+   * Encode this as a graphical model.
+   */
+
+  // 50% of the population smokes (made up numbers)
+  def smoker: Distribution[Boolean] = tf(0.5)
+
+  /**
+   * 95% of smokers have tar in their lungs
+   * 5% of nonsmokers have tar in their lungs
+   */
+  def tar(smoker: Boolean): Distribution[Boolean] = {
+    if (smoker) tf(0.95)
+    else tf(0.05)
+  }
+
+  /**
+   * Observed probabilities of getting cancer broken out by
+   * whether you smoke and whether you have tar in your lungs
+   */
+  def cancer(smoker: Boolean, tar: Boolean): Distribution[Boolean] = {
+    (smoker, tar) match {
+      case (false, false) => tf(0.1)
+      case (true, false) => tf(0.9)
+      case (false, true) => tf(0.05)
+      case (true, true) => tf(0.85)
+    }
+  }
+
+  case class SmokingTrial(smoking: Boolean, cancer: Boolean)
+
+  /**
+   * This encodes the probability distribution of smoking and cancer.
+   * We can use it to calculate p(cancer) and p(cancer|smoking).
+   */
+  def smoking: Distribution[SmokingTrial] = {
+    for {
+      s <- smoker
+      t <- tar(s)
+      c <- cancer(s, t)
+    } yield SmokingTrial(s, c)
+  }
+
+  /*
+   * According to the article, this encodes the graphical model
+   * that models the situation where we force some people to smoke
+   * to see if they get cancer (i.e., p(cancer|do(smoking))), using
+   * only observational data.
+   *
+   * The intuition behind this graphical model is still unclear to me.
+   */
+  def doSmoking: Distribution[SmokingTrial] = {
+    for {
+      s1 <- smoker
+      s2 <- smoker
+      t <- tar(s1)
+      c <- cancer(s2, t)
+    } yield SmokingTrial(s1, c)
+  }
+
+  def runSmoking = {
+    println("p(cancer) = " + smoking.pr(_.cancer))
+    println("p(cancer|smoking) = " + smoking.pr(_.cancer, _.smoking))
+    println("p(cancer|do(smoking)) = " + doSmoking.pr(_.cancer, _.smoking))
+    println()
+    println("Since p(cancer|do(smoking)) < p(cancer), smoking actually prevents cancer (according to our made-up numbers)")
+    println("even though, naively, p(cancer|smoking) > p(cancer)!")
+  }
 }
