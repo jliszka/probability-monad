@@ -55,7 +55,7 @@ trait Distribution[A] {
     }
   }
   
-  private val nn = 1000
+  private val nn = 10000
 
   def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = nn): Double = {
     1.0 * this.filter(given).sample(samples).count(pred) / samples
@@ -115,9 +115,11 @@ trait Distribution[A] {
 
   private def doPlot(data: Iterable[(A, Double)]) = {
     val scale = 100
+    val maxWidth = data.map(_._1.toString.length).max
+    val fmt = "%"+maxWidth+"s %5.2f%% %s"
     data.foreach{ case (a, p) => {
       val hashes = (p * scale).toInt
-      println("%s %5.2f%% %s".format(a.toString, p*100, "#" * hashes))
+      println(fmt.format(a.toString, p*100, "#" * hashes))
     }}    
   }
 }
@@ -140,8 +142,8 @@ object Distribution {
   sealed abstract class Coin
   case object H extends Coin
   case object T extends Coin
-  def coin = discreteUniform(List(H, T))
-  def biasedCoin(p: Double) = discrete(List(H -> p, T -> (1-p)))
+  def coin: Distribution[Coin] = discreteUniform(List(H, T))
+  def biasedCoin(p: Double): Distribution[Coin] = discrete(List(H -> p, T -> (1-p)))
 
   def d(n: Int) = discreteUniform(1 to n)
   def die = d(6)

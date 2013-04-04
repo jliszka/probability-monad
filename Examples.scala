@@ -6,13 +6,13 @@ object Examples {
    * the fair coin?
    */
 
-  case class Trial(haveFairCoin: Boolean, flips: List[Coin])
-  def bayesianCoin(nflips: Int) = {
+  case class CoinTrial(haveFairCoin: Boolean, flips: List[Coin])
+  def bayesianCoin(nflips: Int): Distribution[CoinTrial] = {
     for {
       haveFairCoin <- tf()
       val c = if (haveFairCoin) coin else biasedCoin(0.9)
       flips <- c.repeat(nflips)
-    } yield Trial(haveFairCoin, flips)
+    } yield CoinTrial(haveFairCoin, flips)
   }
   def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
 
@@ -21,7 +21,7 @@ object Examples {
    * How many times do you need to flip a fair coin to get n heads in a row?
    */
 
-  def expectedFlips(flips: Int) = {
+  def expectedFlips(flips: Int): Distribution[Int] = {
     coin.until(cs => cs.length >= flips && cs.take(flips).forall(_ == H)).map(_.length)
   }
 
@@ -33,7 +33,7 @@ object Examples {
   abstract sealed class Patient
   case object Sick extends Patient
   case object Well extends Patient
-  def elisa = {
+  def elisa: Distribution[(Patient, Boolean)] = {
     def test(patient: Patient) = patient match {
       case Sick => tf(0.997)
       case Well => tf(0.019)
@@ -61,7 +61,7 @@ object Examples {
    **/
 
   // Attack once, return the number of matchups the attacker wins
-  def attack(a: Int, d: Int) = {
+  def attack(a: Int, d: Int): Distribution[Int] = {
     for {
       aDice <- dice(a min 3).map(_.sorted.reverse)
       dDice <- dice(d min 2).map(_.sorted.reverse)
@@ -93,7 +93,7 @@ object Examples {
       }
     }
   }
-  def runConquest = conquest(20, List(3, 5, 2, 4)).hist
+  def runConquest = conquest(20, List(3, 5, 2, 4)).plotHist
 
 
   /**
@@ -107,11 +107,11 @@ object Examples {
   def family = {
     discreteUniform(List(Boy, Girl)).until(_ contains Boy)
   }
-  def population(families: Int) = {
+  def population(families: Int): Distribution[Double] = {
     for {
       children <- family.repeat(families).map(_.flatten)
       val girls = children.count(_ == Girl)
-    } yield 1.0 * girls / children.length
+    } yield girls.toDouble / children.length
   }
   def runBoyGirl = population(4).ev
 
@@ -121,7 +121,7 @@ object Examples {
    * comes in every 11 minutes on average, what is the expected length of the line?
    */
 
-  def queue(loadFactor: Double) = {
+  def queue(loadFactor: Double): Distribution[Int] = {
     val incoming = poisson(loadFactor)
     markov(always(0), 100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
   }
@@ -163,7 +163,7 @@ object Examples {
       if (moveLeft) (left+1, right) else (left, right+1)
     }}
   }
-  def runPascal = pascal(6).hist
+  def runPascal = pascal(6).plotHist
 
 
   /**
@@ -294,6 +294,23 @@ object Examples {
   case object AB extends BloodType
   case object O extends BloodType
 
+  implicit object BloodTypeOrd extends Ordering[BloodType] {
+    override def compare(a: BloodType, b: BloodType) = {
+      if (a == b) 0
+      else {
+	(a, b) match {
+	  case (A, _) => -1
+	  case (_, A) => 1
+	  case (B, _) => -1
+	  case (_, B) => 1
+	  case (AB, _) => -1
+	  case (_, AB) => 1
+	  case _ => 1
+	}
+      }
+    }
+  }
+
   val bloodPrior: Distribution[(BloodGene, BloodGene)] = {
     for {
       g1 <- discreteUniform(List(A_, B_, O_))
@@ -324,12 +341,13 @@ object Examples {
     } yield (p1, p2))
   }
 
-  case class BloodTrial(bart: BloodType, lisa: BloodType, homer: BloodType, marge: BloodType, selma: BloodType)
+  case class BloodTrial(bart: BloodType, lisa: BloodType, homer: BloodType, marge: BloodType, selma: BloodType, jackie: BloodType)
   val bloodType = for {
     gHomer <- bloodPrior
     bHomer <- typeFromGene(gHomer)
     gHarry <- bloodPrior
     gJackie <- bloodPrior
+    bJackie <- typeFromGene(gJackie)
     gSelma <- childFromParents(gHarry, gJackie)
     bSelma <- typeFromGene(gSelma)
     gMarge <- childFromParents(gHarry, gJackie)
@@ -338,7 +356,7 @@ object Examples {
     bBart <- typeFromGene(gBart)
     gLisa <- childFromParents(gHomer, gMarge)
     bLisa <- typeFromGene(gLisa)
-  } yield BloodTrial(bBart, bLisa, bHomer, bMarge, bSelma)
+  } yield BloodTrial(bBart, bLisa, bHomer, bMarge, bSelma, bJackie)
 
   def runBloodType = bloodType.filter(_.selma == A).pr(_.bart == A)
 
@@ -417,5 +435,92 @@ object Examples {
     println()
     println("Since p(cancer|do(smoking)) < p(cancer), smoking actually prevents cancer (according to our made-up numbers)")
     println("even though, naively, p(cancer|smoking) > p(cancer)!")
+  }
+
+  /**
+   * The probablistic graphical model
+   *
+   *      Y -> Q
+   *      |
+   *      v
+   * X -> Z -> W
+   *
+   */
+
+  def X = tf(0.4)
+  def Y = tf(0.6)
+  def Z(x: Boolean, y: Boolean) = (x, y) match {
+    case (true, true) => tf(0.2)
+    case (true, false) => tf(0.7)
+    case (false, true) => tf(0.5)
+    case (false, false) => tf(0.8)
+  }
+  def W(z: Boolean) = z match {
+    case true => tf(0.3)
+    case false => tf(0.9)
+  }
+  def Q(y: Boolean) = y match {
+    case true => tf(0.6)
+    case false => tf(0.2)
+  }
+
+  case class Trial(x: Boolean, y: Boolean, z: Boolean, w: Boolean, q: Boolean)
+  def pgm = {
+    for {
+      x <- X
+      y <- Y
+      z <- Z(x, y)
+      w <- W(z)
+      q <- Q(y)
+    } yield Trial(x, y, z, w, q)
+  }
+
+  def dep[A, B](p: Distribution[A])(e1: A => B, e2: A => B)(implicit ord: Ordering[B]) = {
+    p.map(t => (e1(t), e2(t)))
+     .hist.toList
+     .groupBy{ case ((e1, e2), pr) => e1 }
+     .mapValues(vs => {
+        vs.map{ case ((e1, e2), pr) => (e2, pr) }
+     })
+     .toList.sortBy(_._1)(ord)
+     .foreach{ case (e1, e2prs) => {
+       val total = e2prs.map(_._2).sum
+       println()
+       println("%s (%.2f%%)".format(e1, total * 100))
+       e2prs.sortBy(_._1)(ord)
+         .foreach{ case (e2, pr) => {
+	   println("  %s: %.2f%%".format(e2.toString, pr / total * 100))
+	 }}
+     }}
+  }
+
+  def doPGM {
+    println()
+    println("X and Y are independent: p(y|x) = ")
+    dep(pgm)(_.x, _.y)
+
+    println()
+    println("Given knowledge of Z, X and Y are dependent: p(y|x, z=true) = ")
+    dep(pgm.filter(_.z == true))(_.x, _.y)
+
+    println()
+    println("Given knowledge of W, X and Y are dependent: p(y|x, w=false) = ")
+    dep(pgm.filter(_.w == false))(_.x, _.y)
+
+    println()
+    println("X and W are dependent: p(w|x) = ")
+    dep(pgm)(_.x, _.w)
+
+    println()
+    println("Given knowledge of Z, X and W are independent: p(w|x, z=true) = ")
+    dep(pgm.filter(_.z == true))(_.x, _.w)
+
+    println()
+    println("Z and Q are dependent: p(q|z) = ")
+    dep(pgm)(_.z, _.q)
+
+    println()
+    println("Given knowledge of Y, Z and Q are independent: p(q|z, y=true) = ")
+    dep(pgm.filter(_.y == true))(_.z, _.q)
   }
 }
