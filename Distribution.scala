@@ -206,6 +206,10 @@ object Distribution {
     }
   }
 
+  def binomial(p: Double, n: Int): Distribution[Int] = {
+    tf(p).repeat(n).map(_.count(b => b))
+  }
+
   def chi2(n: Int) = List.fill(n)(normal).map(x => x*x).reduceLeft[Distribution[Double]](_ + _)
 
   lazy val cauchy = normal / normal
