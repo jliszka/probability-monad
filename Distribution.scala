@@ -68,14 +68,34 @@ trait Distribution[A] {
   def mean(implicit f: Fractional[A]): A = ev
 
   def variance(implicit f: Fractional[A]): A = {
-    val expectedValue = ev
+    val mean = this.mean
     this.map(x => {
-      val d = f.minus(x, expectedValue)
+      val d = f.minus(x, mean)
       f.times(d, d)
     }).ev
   }
 
   def stdev(implicit f: Fractional[A]): Double = math.sqrt(f.toDouble(variance))
+
+  def skewness(implicit f: Fractional[A]): Double = {
+    val mean = f.toDouble(this.mean)
+    val stdev = this.stdev
+    this.map(a => {
+      val x = f.toDouble(a)
+      val d = (x - mean) / stdev
+      d * d * d
+    }).ev
+  }
+
+  def kurtosis(implicit f: Fractional[A]): A = {
+    val mean = this.mean
+    val variance = this.variance
+    f.div(this.map(x => {
+      val d = f.minus(x, mean)
+      val d2 = f.times(d, d)
+      f.times(d2, d2)
+    }).ev, f.times(variance, variance))
+  }
 
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
 

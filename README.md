@@ -68,7 +68,7 @@ Methods for manipulating distributions include:
 - mapping and flatMapping values inside the distribution
 - creating Markov chains
 - finding the probability of arbitrary predicates, conditional probabililty
-- finding expected values
+- finding expected values (mean), standard deviation, variance, skewness and kurtosis
 - sampling, histogram
 
 [Examples.scala](https://github.com/jliszka/probability-monad/blob/master/Examples.scala) contains some 
