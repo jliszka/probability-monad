@@ -177,20 +177,20 @@ object Distribution {
     val (smaller, bigger) = scaled.partition(_._2 < 1.0)
     private def alias(smaller: List[(A, Double)], bigger: List[(A, Double)]): List[(A, Double, Option[A])] = {
       smaller match {
-	case Nil => bigger.map{ case (a, _) => (a, 1.0, None) }
-	case (s, sp)::ss => {
-	  val (b, pb)::bb = bigger
-	  val remainder = (b, pb - (1.0 - sp))
-	  val rest = if (remainder._2 < 0.9999) alias(remainder :: ss, bb) else alias(ss, remainder :: bb)
-	  (s, sp, Some(b)) :: rest
-	}
+        case Nil => bigger.map{ case (a, _) => (a, 1.0, None) }
+        case (s, sp)::ss => {
+          val (b, pb)::bb = bigger
+          val remainder = (b, pb - (1.0 - sp))
+          val rest = if (remainder._2 < 0.9999) alias(remainder :: ss, bb) else alias(ss, remainder :: bb)
+          (s, sp, Some(b)) :: rest
+        }
       }
     }
     val table = Vector() ++ alias(smaller, bigger)
     private def select(p1: Double, p2: Double, table: Vector[(A, Double, Option[A])]): A = {
       table((p1 * len).toInt) match {
-	case (a, _, None) => a
-	case (a, p, Some(b)) => if (p2 <= p) a else b
+        case (a, _, None) => a
+        case (a, p, Some(b)) => if (p2 <= p) a else b
       }
     }
     override def get = {

@@ -85,11 +85,11 @@ object Examples {
     if (a <= 1) always(0)
     else {
       ds match {
-	case Nil => always(0)
-	case d::dd => for {
-	  (newA, newD) <- attacks(a, d)
-	  c <- conquest(newA-1, dd)
-	} yield c + (if (newD == 0) 1 else 0)
+        case Nil => always(0)
+        case d::dd => for {
+          (newA, newD) <- attacks(a, d)
+          c <- conquest(newA-1, dd)
+        } yield c + (if (newD == 0) 1 else 0)
       }
     }
   }
@@ -187,10 +187,10 @@ object Examples {
 
     def votedFor(party: Party, state: State): Distribution[Boolean] = {
       (party, state) match {
-	case (Democrat, North) => tf(0.94)
-	case (Democrat, South) => tf(0.07)
-	case (Republican, North) => tf(0.85)
-	case (Republican, South) => tf(0.01)
+        case (Democrat, North) => tf(0.94)
+        case (Democrat, South) => tf(0.07)
+        case (Republican, North) => tf(0.85)
+        case (Republican, South) => tf(0.01)
       }
     }
     val senators = discrete(List(
@@ -298,15 +298,15 @@ object Examples {
     override def compare(a: BloodType, b: BloodType) = {
       if (a == b) 0
       else {
-	(a, b) match {
-	  case (A, _) => -1
-	  case (_, A) => 1
-	  case (B, _) => -1
-	  case (_, B) => 1
-	  case (AB, _) => -1
-	  case (_, AB) => 1
-	  case _ => 1
-	}
+        (a, b) match {
+          case (A, _) => -1
+          case (_, A) => 1
+          case (B, _) => -1
+          case (_, B) => 1
+          case (AB, _) => -1
+          case (_, AB) => 1
+          case _ => 1
+        }
       }
     }
   }
@@ -489,8 +489,8 @@ object Examples {
        println("%s (%.2f%%)".format(e1, total * 100))
        e2prs.sortBy(_._1)(ord)
          .foreach{ case (e2, pr) => {
-	   println("  %s: %.2f%%".format(e2.toString, pr / total * 100))
-	 }}
+           println("  %s: %.2f%%".format(e2.toString, pr / total * 100))
+         }}
      }}
   }
 
