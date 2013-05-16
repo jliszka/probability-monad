@@ -55,17 +55,29 @@ trait Distribution[A] {
     }
   }
   
-  private val nn = 10000
+  private val N = 10000
 
-  def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = nn): Double = {
+  def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = N): Double = {
     1.0 * this.filter(given).sample(samples).count(pred) / samples
   }
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
   // value of a die roll, for example, you have to do die.map(_.toDouble).ev.
-  def ev(implicit f: Fractional[A]): A = f.div(sample(nn).foldLeft(f.zero)(f.plus), f.fromInt(nn))
+  def ev(implicit f: Fractional[A]): A = f.div(Stream.fill(N)(self.get).sum, f.fromInt(N))
 
-  def sample(n: Int = nn): List[A] = List.fill(n)(self.get)
+  def mean(implicit f: Fractional[A]): A = ev
+
+  def variance(implicit f: Fractional[A]): A = {
+    val expectedValue = ev
+    this.map(x => {
+      val d = f.minus(x, expectedValue)
+      f.times(d, d)
+    }).ev
+  }
+
+  def stdev(implicit f: Fractional[A]): Double = math.sqrt(f.toDouble(variance))
+
+  def sample(n: Int = N): List[A] = List.fill(n)(self.get)
 
   def zip[B](d: Distribution[B]): Distribution[(A, B)] = new Distribution[(A, B)] {
     override def get = (self.get, d.get)
@@ -89,7 +101,7 @@ trait Distribution[A] {
   }
 
   def hist = {
-    this.sample(nn).groupBy(x=>x).mapValues(_.length.toDouble / nn)
+    this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
   }
 
   def plotHist(implicit ord: Ordering[A] = null) = {
