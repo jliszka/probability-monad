@@ -55,10 +55,14 @@ for creating and manipulating probability distributions. Built-in distributions 
 - uniform discrete (including die and fair coin)
 - weighted discrete (biased coin, uses the [alias method](http://www.keithschwarz.com/darts-dice-coins/))
 - normal
-- poisson
-- binomial
 - cauchy
 - chi2
+- poisson
+- binomial
+- pareto
+- exponential
+- lognormal
+- zipf
 
 Methods for manipulating distributions include:
 

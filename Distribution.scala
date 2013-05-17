@@ -48,8 +48,8 @@ trait Distribution[A] {
     override def get = {
       @tailrec
       def helper(a: A): A = {
-	if (pred(a)) a
-	else helper(f(a).get)
+        if (pred(a)) a
+        else helper(f(a).get)
       }
       helper(self.get)
     }
@@ -226,7 +226,10 @@ object Distribution {
     }
   }
 
-  def fromCDF(cdf: Double => Double) = {
+  /**
+   * Turn any CDF into a Distribution[Double]
+   */
+  def fromCDF(cdf: Double => Double): Distribution[Double] = {
     /**
      * Inverts a monotone increasing function via binary search
      */
