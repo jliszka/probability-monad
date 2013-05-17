@@ -183,7 +183,7 @@ object Distribution {
   
   def tf(p: Double = 0.5) = discrete(List(true -> p, false -> (1-p)))
 
-  def uniform(lo: Double, hi: Double) = u.map(x => (x * (hi - lo)) + lo)
+  def uniform(lo: Double = 0.0, hi: Double = 1.0) = u.map(x => (x * (hi - lo)) + lo)
 
   def discreteUniform[A](values: Iterable[A]): Distribution[A] = new Distribution[A] {
     private val vec = Vector() ++ values
@@ -224,6 +224,45 @@ object Distribution {
       val s = Stream.iterate(1.0)(_ * u.get)
       s.tail.takeWhile(_ > m).length
     }
+  }
+
+  def fromCDF(cdf: Double => Double) = {
+    /**
+     * Inverts a monotone increasing function via binary search
+     */
+    @annotation.tailrec
+    def invert(f: Double => Double, y: Double, min: Double, max: Double): Double = {
+      val x = (min + max) / 2
+      val fx = f(x)
+      if (math.abs(y - fx) < 0.0001) {
+        x
+      } else if (y > f(max)) {
+        invert(f, y, max, max * 2)
+      } else if (y < f(min)) {
+        invert(f, y, min * 2, min)
+      } else if (y > fx) {
+        invert(f, y, x, max)
+      } else { // if (y < fx)
+        invert(f, y, min, x)
+      }
+    }
+
+    uniform().map(y => invert(cdf, y, -1.0, 1.0))
+  }
+
+  def pareto(a: Double, xm: Double = 1.0) = fromCDF(x => {
+    if (x < xm) 0.0
+    else 1 - math.pow(xm / x, a)
+  })
+
+  def exponential(l: Double) = fromCDF(x => {
+    1 - math.exp(-1 * l * x)
+  })
+
+  def lognormal = normal.map(math.exp)
+
+  def zipf(s: Double, n: Int) = {
+    discrete(List.tabulate(n)(k => (k+1, 1.0 / math.pow(k+1, s))))
   }
 
   def binomial(p: Double, n: Int): Distribution[Int] = {
