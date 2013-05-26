@@ -130,22 +130,32 @@ trait Distribution[A] {
     doPlot(sorted)
   }
 
-  def plotBucketedHist(buckets: Int)(implicit ord: Ordering[A], frac: Fractional[A]) = {
-    val histogram = hist.toList.sortBy(_._1)(ord)
-    val min = histogram.first._1
-    val max = histogram.last._1
-    val bucketWidth = frac.div(frac.minus(max, min), frac.fromInt(buckets))
-    val halfBucketWidth = frac.div(bucketWidth, frac.fromInt(2))
-    def toBucket(a: A) = frac.toInt(frac.div(frac.minus(a, min), bucketWidth))
-    def fromBucket(n: Int) = frac.plus(frac.plus(frac.times(frac.fromInt(n), bucketWidth), min), halfBucketWidth)
-    val bucketed = histogram.map{ case (a, p) => (fromBucket(toBucket(a)), p) }
-      .groupBy(_._1)
-      .mapValues(_.map(_._2).sum)
-      .toList.sortBy(_._1)(ord)
+  private def findBucketWidth(min: Double, max: Double, buckets: Int): (Double, Double, Double) = {
+    val widths = List(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+    val span = max - min
+    val p = (math.log(span) / math.log(10)).toInt
+    val scaledWidths = widths.map(_ * math.pow(10, p))
+    val bestWidth = scaledWidths.minBy(w => math.abs(span / w - buckets))
+    val outerMin = (min / bestWidth).toInt * bestWidth
+    val outerMax = ((max / bestWidth).toInt + 1) * bestWidth
+    val actualBuckets = ((outerMax - outerMin) / bestWidth).toInt
+    (outerMin, outerMax, bestWidth)
+  }
+
+  def plotBucketedHist(buckets: Int = 20)(implicit ord: Ordering[A], frac: Fractional[A]) = {
+    val data = this.sample(N).toList.sorted
+    val min = data.first
+    val max = data.last
+    val (outerMin, outerMax, width) = findBucketWidth(frac.toDouble(min), frac.toDouble(max), buckets)
+    def toBucket(a: A) = math.round((frac.toDouble(a) - outerMin) / width) * width + outerMin
+    val bucketed = data
+      .groupBy(toBucket)
+      .mapValues(_.size.toDouble / N)
+      .toList.sortBy(_._1)
     doPlot(bucketed)
   }
 
-  private def doPlot(data: Iterable[(A, Double)]) = {
+  private def doPlot[B](data: Iterable[(B, Double)]) = {
     val scale = 100
     val maxWidth = data.map(_._1.toString.length).max
     val fmt = "%"+maxWidth+"s %5.2f%% %s"
