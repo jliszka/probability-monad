@@ -48,6 +48,75 @@ Or: Each family has children until it has a boy, and then stops. What is the exp
 
     population(4).ev
 
+## How it works
+
+A ```Distribution[T]``` represents a random variable that, when sampled, produces values of type ```T``` according
+to a particular probability distribution. For example, ```Distribution.uniform()``` is a ```Distribution[Double]```
+that produces ```Double``` values between 0.0 and 1.0, uniformly distributed. ```Distribution.coin``` is a 
+```Distribution[Coin]``` that produces the values ```H``` and ```T``` with equal probability, and
+```Distribution.biasedCoin(0.3)``` is a ```Distribution[Coin]``` that produces the value ```H``` 30% of the time
+and the value ```T``` 70% of the time.
+
+You can think of a ```Distribution[T]``` as a collection like any other scala collection that you can ```map```,
+```flatMap``` and ```filter``` over. The presence of these methods allow you to use scala's for-comprehensions to manipulate
+distributions. For example, here's how you would create a distribution that represents the sum of 2 die rolls:
+
+    val dice = for {
+      d1 <- die
+      d2 <- die
+    } yield d1 + d2
+
+Here, ```die``` is a ```Distribution[Int]```, and ```d1``` and ```d2``` are both ```Int```s. The type of ```dice```
+is ```Distribution[Int]```. You can see that for-comprehensions let you define new a distribution in terms of individual
+samples from other distributions.
+
+You can visualize a discrete distribution with ```plotHist```:
+
+    scala> dice.plotHist
+     2  2.61% ##
+     3  5.48% #####
+     4  8.70% ########
+     5 10.53% ##########
+     6 14.21% ##############
+     7 16.90% ################
+     8 13.90% #############
+     9 11.43% ###########
+    10  8.35% ########
+    11  5.17% #####
+    12  2.72% ##
+
+For continuous distributions, use ```plotBucketedHist```:
+
+    scala> normal.map(_ * 2 + 1).plotBucketedHist(20)
+    -7.0  0.02% 
+    -6.0  0.03% 
+    -5.0  0.22% 
+    -4.0  1.01% #
+    -3.0  2.69% ##
+    -2.0  6.43% ######
+    -1.0 12.19% ############
+     0.0 17.07% #################
+     1.0 19.74% ###################
+     2.0 17.55% #################
+     3.0 12.17% ############
+     4.0  6.55% ######
+     5.0  2.92% ##
+     6.0  1.10% #
+     7.0  0.23% 
+     8.0  0.06% 
+     9.0  0.01% 
+    10.0  0.01% 
+
+This probability monad is based on sampling, so the values and plots produced will be inexact and will vary between runs.
+
+    scala> normal.stdev
+    res9: Double = 1.0044818262040809
+
+    scala> normal.stdev
+    res10: Double = 1.0071194147525722
+
+# Code and examples
+
 [Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains code
 for creating and manipulating probability distributions. Built-in distributions include:
 
