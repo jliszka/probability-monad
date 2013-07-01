@@ -264,22 +264,6 @@ object Examples {
 
 
   /**
-   * Two envelopes problem
-   * TODO
-   */ 
-
-  val envelopes = {
-    for {
-      n <- coin.until(_ contains H).map(_.length)
-      amt1 = 1 << n      // likely to overflow
-      amt2 = 1 << (n+1)
-      w <- tf()
-      envs = if (w) (amt1, amt2) else (amt2, amt1)
-    } yield envs
-  }
-
-
-  /**
    * Bayesian networks
    */
 
@@ -397,7 +381,12 @@ object Examples {
     }
   }
 
-  case class SmokingTrial(smoking: Boolean, cancer: Boolean)
+  case class SmokingTrial(smoker: Boolean, tar: Boolean, cancer: Boolean) {
+    override def toString = {
+      "smoker=%-5s tar=%-5s cancer=%-5s".format(smoker, tar, cancer)
+    }
+  }
+  implicit val SmokingTrialOrdering = Ordering.by((t: SmokingTrial) => (t.smoker, t.tar, t.cancer))
 
   /**
    * This encodes the probability distribution of smoking and cancer.
@@ -408,13 +397,13 @@ object Examples {
       s <- smoker
       t <- tar(s)
       c <- cancer(s, t)
-    } yield SmokingTrial(s, c)
+    } yield SmokingTrial(s, t, c)
   }
 
   /*
    * According to the article, this encodes the graphical model
    * that models the situation where we force some people to smoke
-   * to see if they get cancer (i.e., p(cancer|do(smoking))), using
+   * to see if they get cancer (i.e., p(cancer|do(smoker))), using
    * only observational data.
    *
    * The intuition behind this graphical model is still unclear to me.
@@ -425,16 +414,143 @@ object Examples {
       s2 <- smoker
       t <- tar(s1)
       c <- cancer(s2, t)
-    } yield SmokingTrial(s1, c)
+    } yield SmokingTrial(s1, t, c)
   }
 
   def runSmoking = {
     println("p(cancer) = " + smoking.pr(_.cancer))
-    println("p(cancer|smoking) = " + smoking.pr(_.cancer, _.smoking))
-    println("p(cancer|do(smoking)) = " + doSmoking.pr(_.cancer, _.smoking))
+    println("p(cancer|smoking) = " + smoking.pr(_.cancer, _.smoker))
+    println("p(cancer|do(smoking)) = " + doSmoking.pr(_.cancer, _.smoker))
     println()
     println("Since p(cancer|do(smoking)) < p(cancer), smoking actually prevents cancer (according to our made-up numbers)")
     println("even though, naively, p(cancer|smoking) > p(cancer)!")
+  }
+
+
+  // Experimental...
+  object Smoking {
+    def hidden = tf(0.3)
+    def smoker(hidden: Boolean) = hidden match {
+      case true => tf(0.7)
+      case false => tf(0.3)
+    }
+    def tar(smoker: Boolean): Distribution[Boolean] = smoker match {
+      case true => tf(0.95)
+      case false => tf(0.05)
+    }
+    def cancer(hidden: Boolean, tar: Boolean): Distribution[Boolean] = {
+      (hidden, tar) match {
+        case (true, true) => tf(0.7)
+        case (true, false) => tf(0.9)
+        case (false, true) => tf(0.05)
+        case (false, false) => tf(0.1)
+      }
+    }
+
+    val natural = for {
+      h <- hidden
+      s <- smoker(h)
+      t <- tar(s)
+      c <- cancer(h, t)
+    } yield SmokingTrial(s, t, c)
+
+    def doSmoker = for {
+      h <- hidden
+      s <- smoker(h)
+    } yield s
+
+    val controlled = for {
+      h <- hidden
+      s <- doSmoker
+      t <- tar(s)
+      c <- cancer(h, t)
+    } yield SmokingTrial(s, t, c)
+
+    val doSmoking = {
+      val model = natural
+      def smoker = {
+        model.map(_.smoker)
+      }
+      def tar(smoker: Boolean) = {
+        model.filter(_.smoker == smoker).map(_.tar)
+      }
+      def cancer(smoker: Boolean, tar: Boolean) = {
+        model.filter(_.smoker == smoker).filter(_.tar == tar).map(_.cancer)
+      }
+
+      for {
+        s1 <- smoker
+        s2 <- smoker
+        t <- tar(s1)
+        c <- cancer(s2, t)
+      } yield SmokingTrial(s1, t, c)
+    }
+  }
+
+  object Test {
+    case class Trial(a: Boolean, b1: Boolean, b2: Boolean, c: Boolean)
+    def hidden = tf(0.3)
+    def A(hidden: Boolean) = hidden match {
+      case true => tf(0.7)
+      case false => tf(0.3)
+    }
+    def B1(a: Boolean) = a match {
+      case true => tf(0.95)
+      case false => tf(0.75)
+    }
+    def B2(a: Boolean) = a match {
+      case true => tf(0.3)
+      case false => tf(0.2)
+    }
+    def C(hidden: Boolean, b1: Boolean, b2: Boolean) = (hidden, b1, b2) match {
+      case (true, true, true) => tf(0.8)
+      case (true, true, false) => tf(0.9)
+      case (true, false, true) => tf(0.6)
+      case (true, false, false) => tf(0.7)
+      case (false, true, true) => tf(0.4)
+      case (false, true, false) => tf(0.5)
+      case (false, false, true) => tf(0.2)
+      case (false, false, false) => tf(0.3)
+    }
+
+    val natural = for {
+      h <- hidden
+      a <- A(h)
+      b1 <- B1(a)
+      b2 <- B2(a)
+      c <- C(h, b1, b2)
+    } yield Trial(a, b1, b2, c)
+
+    val doA = for {
+      h <- hidden
+      a <- A(h)
+    } yield a
+
+    val controlled = for {
+      h <- hidden
+      a <- doA
+      b1 <- B1(a)
+      b2 <- B2(a)
+      c <- C(h, b1, b2)
+    } yield Trial(a, b1, b2, c)
+
+    val doTest = {
+      val model = natural
+      def A = model.map(_.a)
+      def B1(a: Boolean) = model.filter(_.a == a).map(_.b1)
+      def B2(a: Boolean) = model.filter(_.a == a).map(_.b2)
+      def C(a: Boolean, b1: Boolean, b2: Boolean) = {
+        model.filter(_.a == a).filter(_.b1 == b1).filter(_.b2 == b2).map(_.c)
+      }
+
+      for {
+        a1 <- A
+        a2 <- A
+        b1 <- B1(a1)
+        b2 <- B2(a1)
+        c <- C(a2, b1, b2)
+      } yield Trial(a1, b1, b2, c)
+    }
   }
 
   /**
@@ -523,4 +639,96 @@ object Examples {
     println("Given knowledge of Y, Z and Q are independent: p(q|z, y=true) = ")
     dep(pgm.filter(_.y == true))(_.z, _.q)
   }
+
+  def centralLimitTheorem1(d: Distribution[Double], samples: Int) = {
+    println()
+    println("Original distribution:")
+    d.plotBucketedHist(20)
+
+    println()
+    val stdev = d.stdev
+    println("mean = " + d.mean)
+    println("stdev = " + stdev)
+
+    println()
+    println("Distribution of means of samples of size %d:".format(samples))
+    val sd = d.repeat(samples).map(xs => xs.sum / samples)
+    sd.plotBucketedHist(20)
+
+    println()
+    println("This distribution is always a normal distribution regardless of the shape of the original distribution.")
+    println("Empirically, the mean and stdev are:")
+    println("mean = " + sd.mean)
+    println("stdev = " + sd.stdev)
+
+    println()
+    println("However, we can also compute the stdev directly from the original distribution:")
+    println("stdev = s / sqrt(n) = " + stdev / math.sqrt(samples))
+  }
+
+  def runCentralLimitTheorem1 = centralLimitTheorem1(uniform(), 100)
+
+  def centralLimitTheorem2(d: Distribution[Boolean], samples: Int) = {
+    val p = d.pr(x => x)
+    println()
+    println("p = pr(b = true) = " + p)
+
+    println()
+    println("Distribution of pr(b = true) of samples of size %d:".format(samples))
+    val sd = d.repeat(samples).map(xs => xs.count(x => x).toDouble / samples)
+    sd.plotBucketedHist(20)
+
+    println()
+    println("This distribution is always a normal distribution.")
+    println("Empirically, the mean and stdev are:")
+    println("mean = " + sd.mean)
+    println("stdev = " + sd.stdev)
+
+    println()
+    println("However, we can also compute the stdev directly from the original distribution:")
+    println("stdev = sqrt(p*(1-p)/n) = " + math.sqrt(p * (1 - p) / samples))
+  }
+
+  def runCentralLimitTheorem2 = centralLimitTheorem2(tf(0.2), 100)
+
+  def centralLimitTheorem3(d1: Distribution[Double], d2: Distribution[Double], samples1: Int, samples2: Int) = {
+    println()
+    println("Original distribution 1:")
+    d1.plotBucketedHist(20)
+
+    println()
+    val mean1 = d1.mean
+    val stdev1 = d1.stdev
+    println("mean = " + mean1)
+    println("stdev = " + stdev1)
+
+    println()
+    println("Original distribution 2:")
+    d2.plotBucketedHist(20)
+    println()
+    val mean2 = d2.mean
+    val stdev2 = d2.stdev
+    println("mean = " + mean2)
+    println("stdev = " + stdev2)
+
+    println()
+    println("Distribution of difference of means of samples of size %d and %d:".format(samples1, samples2))
+    val sd1 = d1.repeat(samples1).map(xs => xs.sum / xs.size)
+    val sd2 = d2.repeat(samples2).map(xs => xs.sum / xs.size)
+    val sd = sd1 - sd2
+    sd.plotBucketedHist(20)
+
+    println()
+    println("This distribution is always a normal distribution regardless of the shapes of the original distributions.")
+    println("Empirically, the mean and stdev are:")
+    println("mean = " + sd.mean)
+    println("stdev = " + sd.stdev)
+
+    println()
+    println("However, we can also compute the mean and stdev directly from the original distributions:")
+    println("mean = mean1 - mean2 = " + (d1.mean - d2.mean))
+    println("stdev = sqrt( stdev1^2 / n1 + stdev2^2 / n2 ) = " + math.sqrt(stdev1 * stdev1 / samples1 + stdev2 * stdev2 / samples2))
+  }
+
+  def runCentralLimitTheorem3 = centralLimitTheorem3(normal, uniform(), 100, 200)
 }

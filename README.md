@@ -18,7 +18,7 @@ probability you have the fair coin?
   
     bayesianCoin(5).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
 
-Or: You repeatedly roll a 6-sided and keep a running sum. What is the probability the sum reaches
+Or: You repeatedly roll a 6-sided die and keep a running sum. What is the probability the sum reaches
 exactly 30?
 
     def dieSum(rolls: Int): Distribution[List[Int]] = {
@@ -67,10 +67,9 @@ for creating and manipulating probability distributions. Built-in distributions 
 Methods for manipulating distributions include:
 
 - adding (convolution), subracting (cross-correlation), multiplying and dividing distributions
-- producing joint distributions from single distributions
-- conditional distributions (amounts to a filter)
-- mapping and flatMapping values inside the distribution
-- creating Markov chains
+- joint distributions (a flatMap)
+- marginal distributions (a filter)
+- creating Markov chains (an iterated flatMap)
 - finding the probability of arbitrary predicates, conditional probabililty
 - finding expected values (mean), standard deviation, variance, skewness and kurtosis
 - sampling, histogram
