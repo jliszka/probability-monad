@@ -67,38 +67,38 @@ trait Distribution[A] {
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
   // value of a die roll, for example, you have to do die.map(_.toDouble).ev.
-  def ev(implicit f: Fractional[A]): A = f.div(Stream.fill(N)(self.get).sum, f.fromInt(N))
+  def ev(implicit toDouble: A <:< Double): Double = Stream.fill(N)(toDouble(self.get)).sum / N
 
-  def mean(implicit f: Fractional[A]): A = ev
+  def mean(implicit toDouble: A <:< Double): Double = ev
 
-  def variance(implicit f: Fractional[A]): A = {
+  private def square(x: Double) = x * x
+  private def cube(x: Double) = x * x * x
+
+  def variance(implicit toDouble: A <:< Double): Double = {
     val mean = this.mean
     this.map(x => {
-      val d = f.minus(x, mean)
-      f.times(d, d)
+      square(toDouble(x) - mean)
     }).ev
   }
 
-  def stdev(implicit f: Fractional[A]): Double = math.sqrt(f.toDouble(variance))
+  def stdev(implicit toDouble: A <:< Double): Double = {
+    math.sqrt(this.variance)
+  }
 
-  def skewness(implicit f: Fractional[A]): Double = {
-    val mean = f.toDouble(this.mean)
+  def skewness(implicit toDouble: A <:< Double): Double = {
+    val mean = this.mean
     val stdev = this.stdev
-    this.map(a => {
-      val x = f.toDouble(a)
-      val d = (x - mean) / stdev
-      d * d * d
+    this.map(x => {
+      cube((toDouble(x) - mean) / stdev)
     }).ev
   }
 
-  def kurtosis(implicit f: Fractional[A]): A = {
+  def kurtosis(implicit toDouble: A <:< Double): Double = {
     val mean = this.mean
     val variance = this.variance
-    f.div(this.map(x => {
-      val d = f.minus(x, mean)
-      val d2 = f.times(d, d)
-      f.times(d2, d2)
-    }).ev, f.times(variance, variance))
+    this.map(x => {
+      square(square(toDouble(x) - mean))
+    }).ev / square(variance)
   }
 
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
@@ -120,8 +120,8 @@ trait Distribution[A] {
   def *(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
     override def get = n.times(self.get, d.get)
   }
-  def /(d: Distribution[A])(implicit f: Fractional[A]): Distribution[A] = new Distribution[A] {
-    override def get = f.div(self.get, d.get)
+  def /(d: Distribution[A])(implicit toDouble: A <:< Double): Distribution[Double] = new Distribution[Double] {
+    override def get = toDouble(self.get) / toDouble(d.get)
   }
 
   def hist = {
