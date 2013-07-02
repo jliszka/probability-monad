@@ -1,3 +1,5 @@
+package probability_monad
+
 object Examples {
   import Distribution._
 
