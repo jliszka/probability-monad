@@ -1,3 +1,5 @@
+package probability_monad
+
 import java.math.MathContext
 import scala.annotation.tailrec
 import scala.math.BigDecimal
@@ -148,7 +150,7 @@ trait Distribution[A] {
 
   def plotBucketedHist(buckets: Int = 20)(implicit ord: Ordering[A], frac: Fractional[A]) = {
     val data = this.sample(N).toList.sorted
-    val min = data.first
+    val min = data.head
     val max = data.last
     val (outerMin, outerMax, width, nbuckets) = findBucketWidth(frac.toDouble(min), frac.toDouble(max), buckets)
     val rm = BigDecimal.RoundingMode.HALF_UP

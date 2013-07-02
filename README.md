@@ -148,7 +148,7 @@ example uses, and possibly a RISK simulator.
 
 To try out some examples, do
 
-    $ ./run.sh
+    $ sbt console
 
     scala> runBayesianCoin(5)
 
