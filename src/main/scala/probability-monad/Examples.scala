@@ -668,7 +668,7 @@ object Examples {
     println("stdev = s / sqrt(n) = " + stdev / math.sqrt(samples))
   }
 
-  def runCentralLimitTheorem1 = centralLimitTheorem1(uniform(), 100)
+  def runCentralLimitTheorem1 = centralLimitTheorem1(uniform, 100)
 
   def centralLimitTheorem2(d: Distribution[Boolean], samples: Int) = {
     val p = d.pr(x => x)
@@ -732,5 +732,5 @@ object Examples {
     println("stdev = sqrt( stdev1^2 / n1 + stdev2^2 / n2 ) = " + math.sqrt(stdev1 * stdev1 / samples1 + stdev2 * stdev2 / samples2))
   }
 
-  def runCentralLimitTheorem3 = centralLimitTheorem3(normal, uniform(), 100, 200)
+  def runCentralLimitTheorem3 = centralLimitTheorem3(normal, uniform, 100, 200)
 }

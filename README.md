@@ -132,6 +132,7 @@ for creating and manipulating probability distributions. Built-in distributions 
 - exponential
 - lognormal
 - zipf
+- student's t-distribution
 
 Methods for manipulating distributions include:
 
@@ -148,7 +149,7 @@ example uses, and possibly a RISK simulator.
 
 To try out some examples, do
 
-    $ sbt console
+    $ ./sbt console
 
     scala> runBayesianCoin(5)
 

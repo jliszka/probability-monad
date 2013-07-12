@@ -114,14 +114,26 @@ trait Distribution[A] {
   def +(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
     override def get = n.plus(self.get, d.get)
   }
+  def +(x: A)(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
+    override def get = n.plus(self.get, x)
+  }
   def -(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
     override def get = n.minus(self.get, d.get)
+  }
+  def -(x: A)(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
+    override def get = n.minus(self.get, x)
   }
   def *(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
     override def get = n.times(self.get, d.get)
   }
+  def *(x: A)(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
+    override def get = n.times(self.get, x)
+  }
   def /(d: Distribution[A])(implicit toDouble: A <:< Double): Distribution[Double] = new Distribution[Double] {
     override def get = toDouble(self.get) / toDouble(d.get)
+  }
+  def /(x: A)(implicit toDouble: A <:< Double): Distribution[Double] = new Distribution[Double] {
+    override def get = toDouble(self.get) / toDouble(x)
   }
 
   def hist = {
@@ -180,13 +192,9 @@ object Distribution {
     override def get = value
   }
 
-  object u extends Distribution[Double] {
-    override def get = rand.nextDouble()
-  }
-
-  object normal extends Distribution[Double] {
-    override def get = rand.nextGaussian()
-  }
+  /**
+   * Discrete distributions
+   */
 
   sealed abstract class Coin
   case object H extends Coin
@@ -199,8 +207,6 @@ object Distribution {
   def dice(n: Int) = die.repeat(n)
   
   def tf(p: Double = 0.5) = discrete(List(true -> p, false -> (1-p)))
-
-  def uniform(lo: Double = 0.0, hi: Double = 1.0) = u.map(x => (x * (hi - lo)) + lo)
 
   def discreteUniform[A](values: Iterable[A]): Distribution[A] = new Distribution[A] {
     private val vec = Vector() ++ values
@@ -231,67 +237,77 @@ object Distribution {
       }
     }
     override def get = {
-      select(u.get, u.get, table)
+      select(uniform.get, uniform.get, table)
     }
-  }
-
-  def poisson(lambda: Double): Distribution[Int] = new Distribution[Int] {
-    override def get = {
-      val m = math.exp(-lambda)
-      val s = Stream.iterate(1.0)(_ * u.get)
-      s.tail.takeWhile(_ > m).length
-    }
-  }
-
-  /**
-   * Turn any CDF into a Distribution[Double]
-   */
-  def fromCDF(cdf: Double => Double): Distribution[Double] = {
-    /**
-     * Inverts a monotone increasing function via binary search
-     */
-    @annotation.tailrec
-    def invert(f: Double => Double, y: Double, min: Double, max: Double): Double = {
-      val x = (min + max) / 2
-      val fx = f(x)
-      if (math.abs(y - fx) < 0.0001) {
-        x
-      } else if (y > f(max)) {
-        invert(f, y, max, max * 2)
-      } else if (y < f(min)) {
-        invert(f, y, min * 2, min)
-      } else if (y > fx) {
-        invert(f, y, x, max)
-      } else { // if (y < fx)
-        invert(f, y, min, x)
-      }
-    }
-
-    uniform().map(y => invert(cdf, y, -1.0, 1.0))
-  }
-
-  def pareto(a: Double, xm: Double = 1.0) = fromCDF(x => {
-    if (x < xm) 0.0
-    else 1 - math.pow(xm / x, a)
-  })
-
-  def exponential(l: Double) = fromCDF(x => {
-    1 - math.exp(-1 * l * x)
-  })
-
-  def lognormal = normal.map(math.exp)
-
-  def zipf(s: Double, n: Int) = {
-    discrete(List.tabulate(n)(k => (k+1, 1.0 / math.pow(k+1, s))))
   }
 
   def binomial(p: Double, n: Int): Distribution[Int] = {
     tf(p).repeat(n).map(_.count(b => b))
   }
 
-  def chi2(n: Int) = List.fill(n)(normal).map(x => x*x).reduceLeft[Distribution[Double]](_ + _)
+  def poisson(lambda: Double): Distribution[Int] = new Distribution[Int] {
+    override def get = {
+      val m = math.exp(-lambda)
+      val s = Stream.iterate(1.0)(_ * uniform.get)
+      s.tail.takeWhile(_ > m).length
+    }
+  }
 
-  lazy val cauchy = normal / normal
+  def zipf(s: Double, n: Int): Distribution[Int] = {
+    discrete((1 to n).map(k => k -> 1.0 / math.pow(k, s)))
+  }
+
+  /**
+   * Continuous distributions
+   */
+
+  object uniform extends Distribution[Double] {
+    override def get = rand.nextDouble()
+  }
+
+  object normal extends Distribution[Double] {
+    override def get = rand.nextGaussian()
+  }
+
+  def chi2(n: Int): Distribution[Double] = {
+    normal.map(x => x*x).repeat(n).map(_.sum)
+  }
+
+  def students_t(df: Int): Distribution[Double] = {
+    for {
+      z <- normal
+      v <- chi2(df)
+    } yield z * math.sqrt(df / v)
+  }
+
+  def pareto(a: Double, xm: Double = 1.0): Distribution[Double] = {
+    uniform.map(x => math.pow(x, -1/a)) * xm
+  }
+
+  def exponential(l: Double): Distribution[Double] = {
+    uniform.map(math.log) / (-l)
+  }
+
+  def laplace(b: Double): Distribution[Double] = {
+    val d = exponential(1/b)
+    d - d
+  }
+
+  def F(d1: Double, d2: Double): Distribution[Double] = {
+    chi2(d1) / chi2(d2)
+  }
+
+  def lognormal: Distribution[Double] = {
+    normal.map(math.exp)
+  }
+
+  def cauchy: Distribution[Double] = {
+    normal / normal
+  }
+
+  /**
+   * Markov chains
+   */
 
   def markov[A](init: Distribution[A], steps: Int)(transition: A => Distribution[A]): Distribution[A] = {
     init.iterate(steps, transition)
