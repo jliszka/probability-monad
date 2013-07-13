@@ -59,8 +59,38 @@ object Examples {
 
 
   /**
+   * Given a biased coin with unknown bias distributed according to `prior`,
+   * after flipping `nflips` times and observing `successes` heads,
+   * what is the posterior distribution of the bias?
+   */
+
+  def unknownBiasedCoin(prior: Distribution[Double], nflips: Int, successes: Int): Distribution[Double] = {
+    case class Trial(p: Double, successes: Int)
+    val d = for {
+      p <- prior
+      flips <- tf(p).repeat(nflips)
+    } yield Trial(p, flips.count(b => b))
+    d.filter(_.successes == successes).map(_.p)
+  }
+
+  /**
+   * Given a distribution `dist` with unknown parameter of type `A`, and a prior distribution `prior` of that parameter,
+   * and given the `evidence` after conducting a `trial` using `dist`, what is the posterior distribution of the parameter?
+   */
+
+  def posterior[A, B, C](prior: Distribution[A])(dist: A => Distribution[B])(trial: Distribution[B] => Distribution[C])(evidence: C): Distribution[A] = {
+    case class Trial(p: A, evidence: C)
+    val d = for {
+      p <- prior
+      c <- trial(dist(p))
+    } yield Trial(p, c)
+    d.filter(_.evidence == evidence).map(_.p)
+  }
+
+
+  /**
    * RISK
-   **/
+   */
 
   // Attack once, return the number of matchups the attacker wins
   def attack(a: Int, d: Int): Distribution[Int] = {
