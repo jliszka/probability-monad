@@ -103,6 +103,14 @@ trait Distribution[A] {
 
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
 
+  /**
+   * "Freeze" a distribution by taking a sample and serving values out of that sample at random.
+   * Useful for when a distribution is expensive to compute and is being sampled from repeatedly.
+   */
+  def freeze: Distribution[A] = {
+    Distribution.discreteUniform(sample(N*10))
+  }
+
   def zip[B](d: Distribution[B]): Distribution[(A, B)] = new Distribution[(A, B)] {
     override def get = (self.get, d.get)
   }
@@ -230,6 +238,7 @@ object Distribution {
   def dice(n: Int) = die.repeat(n)
   
   def tf(p: Double = 0.5) = discrete(List(true -> p, false -> (1-p)))
+  def bernoulli(p: Double = 0.5) = tf(p)
 
   def discreteUniform[A](values: Iterable[A]): Distribution[A] = new Distribution[A] {
     private val vec = Vector() ++ values
@@ -312,11 +321,15 @@ object Distribution {
   }
 
   def pareto(a: Double, xm: Double = 1.0): Distribution[Double] = {
-    uniform.map(x => math.pow(x, -1/a)) * xm
+    for {
+      x <- uniform
+    } yield xm * math.pow(x, -1/a)
   }
 
   def exponential(l: Double): Distribution[Double] = {
-    uniform.map(math.log) / (-l)
+    for {
+      x <- uniform
+    } yield math.log(x) / (-l)
   }
 
   def laplace(b: Double): Distribution[Double] = {
@@ -329,11 +342,19 @@ object Distribution {
   }
 
   def lognormal: Distribution[Double] = {
-    normal.map(math.exp)
+    for {
+      z <- normal
+    } yield math.exp(z)
   }
 
   def cauchy: Distribution[Double] = {
     normal / normal
+  }
+
+  def weibull(l: Double, k: Double): Distribution[Double] = {
+    for {
+      y <- exponential(1)
+    } yield l * math.pow(y, 1/k)
   }
 
   /**
