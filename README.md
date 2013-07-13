@@ -70,9 +70,9 @@ Here, ```die``` is a ```Distribution[Int]```, and ```d1``` and ```d2``` are both
 is ```Distribution[Int]```. You can see that for-comprehensions let you define new a distribution in terms of individual
 samples from other distributions.
 
-You can visualize a discrete distribution with ```plotHist```:
+You can visualize a distribution with ```hist```:
 
-    scala> dice.plotHist
+    scala> dice.hist
      2  2.61% ##
      3  5.48% #####
      4  8.70% ########
@@ -85,9 +85,9 @@ You can visualize a discrete distribution with ```plotHist```:
     11  5.17% #####
     12  2.72% ##
 
-For continuous distributions, use ```plotBucketedHist```:
+If you want more control over the display of continuous distributions, use ```bucketedHist```:
 
-    scala> normal.map(_ * 2 + 1).plotBucketedHist(20)
+    scala> normal.map(_ * 2 + 1).bucketedHist(20)   // 20 buckets, min & max determined automatically
     -7.0  0.02% 
     -6.0  0.03% 
     -5.0  0.22% 
@@ -105,7 +105,31 @@ For continuous distributions, use ```plotBucketedHist```:
      7.0  0.23% 
      8.0  0.06% 
      9.0  0.01% 
-    10.0  0.01% 
+    10.0  0.01%
+
+    scala> cauchy.bucketedHist(-10, 10, 20)   // min=-10, max=10, #buckets=20
+    -10.0  0.20% 
+     -9.0  0.38% 
+     -8.0  0.44% 
+     -7.0  0.55% 
+     -6.0  0.82% 
+     -5.0  1.23% #
+     -4.0  1.85% #
+     -3.0  2.92% ##
+     -2.0  6.78% ######
+     -1.0 16.78% ################
+      0.0 30.04% ##############################
+      1.0 16.64% ################
+      2.0  6.22% ######
+      3.0  3.06% ###
+      4.0  1.76% #
+      5.0  1.26% #
+      6.0  0.84% 
+      7.0  0.67% 
+      8.0  0.48% 
+      9.0  0.42% 
+     10.0  0.14% 
+
 
 This probability monad is based on sampling, so the values and plots produced will be inexact and will vary between runs.
 
@@ -120,18 +144,21 @@ This probability monad is based on sampling, so the values and plots produced wi
 [Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains code
 for creating and manipulating probability distributions. Built-in distributions include:
 
-- uniform continuous 
 - uniform discrete (including die and fair coin)
 - weighted discrete (biased coin, uses the [alias method](http://www.keithschwarz.com/darts-dice-coins/))
+- bernoulli
+- geometric
+- binomial
+- negative binomial
+- poisson
+- zipf
+- uniform continuous 
 - normal
 - cauchy
 - chi2
-- poisson
-- binomial
 - pareto
 - exponential
 - lognormal
-- zipf
 - student's t-distribution
 
 Methods for manipulating distributions include:

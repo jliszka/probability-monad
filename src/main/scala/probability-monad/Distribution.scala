@@ -136,12 +136,20 @@ trait Distribution[A] {
     override def get = toDouble(self.get) / toDouble(x)
   }
 
-  def hist = {
+  def hist(implicit ord: Ordering[A] = null, d: A <:< Double = null) = {
+    if (d == null) {
+      plotHist(ord)
+    } else {
+      bucketedHist(20)(ord, d)
+    }
+  }
+
+  def histData = {
     this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
   }
 
-  def plotHist(implicit ord: Ordering[A] = null) = {
-    val histogram = hist.toList
+  private def plotHist(implicit ord: Ordering[A] = null) {
+    val histogram = this.histData.toList
     val sorted = if (ord == null) histogram else histogram.sortBy(_._1)(ord)
     doPlot(sorted)
   }
@@ -160,13 +168,28 @@ trait Distribution[A] {
     (outerMin, outerMax, bestWidth, actualBuckets)
   }
 
-  def plotBucketedHist(buckets: Int = 20)(implicit ord: Ordering[A], frac: Fractional[A]) = {
+  def bucketedHist(buckets: Int = 20)(implicit ord: Ordering[A], toDouble: A <:< Double) {
     val data = this.sample(N).toList.sorted
     val min = data.head
     val max = data.last
-    val (outerMin, outerMax, width, nbuckets) = findBucketWidth(frac.toDouble(min), frac.toDouble(max), buckets)
+    val (outerMin, outerMax, width, nbuckets) = findBucketWidth(toDouble(min), toDouble(max), buckets)
+    bucketedHistHelper(outerMin, outerMax, nbuckets, data)(ord, toDouble)
+  }
+
+  def bucketedHist(min: Double, max: Double, nbuckets: Int)
+                  (implicit ord: Ordering[A], toDouble: A <:< Double) {
+    val data = this.sample(N).toList.sorted.filter(a => {
+      val x = toDouble(a)
+      min <= x && x <= max
+    })
+    bucketedHistHelper(BigDecimal(min), BigDecimal(max), nbuckets, data)(ord, toDouble)
+  }
+
+  private def bucketedHistHelper(min: BigDecimal, max: BigDecimal, nbuckets: Int, data: List[A])
+                  (implicit ord: Ordering[A], toDouble: A <:< Double) {
     val rm = BigDecimal.RoundingMode.HALF_UP
-    def toBucket(a: A): BigDecimal = ((frac.toDouble(a) - outerMin) / width).setScale(0, rm) * width + outerMin
+    val width = (max - min) / nbuckets
+    def toBucket(a: A): BigDecimal = ((toDouble(a) - min) / width).setScale(0, rm) * width + min
     val bucketed = data
       .groupBy(toBucket)
       .mapValues(_.size.toDouble / N)
@@ -241,8 +264,16 @@ object Distribution {
     }
   }
 
+  def geometric(p: Double): Distribution[Int] = {
+    tf(p).until(_.headOption == Some(true)).map(_.size - 1)
+  }
+
   def binomial(p: Double, n: Int): Distribution[Int] = {
     tf(p).repeat(n).map(_.count(b => b))
+  }
+
+  def negativeBinomial(p: Double, r: Int): Distribution[Int] = {
+    tf(p).until(_.count(b => !b) == r).map(_.size - r)
   }
 
   def poisson(lambda: Double): Distribution[Int] = new Distribution[Int] {
@@ -293,7 +324,7 @@ object Distribution {
     d - d
   }
 
-  def F(d1: Double, d2: Double): Distribution[Double] = {
+  def F(d1: Int, d2: Int): Distribution[Double] = {
     chi2(d1) / chi2(d2)
   }
 

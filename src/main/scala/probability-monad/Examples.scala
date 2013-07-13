@@ -95,7 +95,7 @@ object Examples {
       }
     }
   }
-  def runConquest = conquest(20, List(3, 5, 2, 4)).plotHist
+  def runConquest = conquest(20, List(3, 5, 2, 4)).hist
 
 
   /**
@@ -165,7 +165,7 @@ object Examples {
       if (moveLeft) (left+1, right) else (left, right+1)
     }}
   }
-  def runPascal = pascal(6).plotHist
+  def runPascal = pascal(6).hist
 
 
   /**
@@ -595,7 +595,7 @@ object Examples {
 
   def dep[A, B](p: Distribution[A])(e1: A => B, e2: A => B)(implicit ord: Ordering[B]) = {
     p.map(t => (e1(t), e2(t)))
-     .hist.toList
+     .histData.toList
      .groupBy{ case ((e1, e2), pr) => e1 }
      .mapValues(vs => {
         vs.map{ case ((e1, e2), pr) => (e2, pr) }
@@ -645,7 +645,7 @@ object Examples {
   def centralLimitTheorem1(d: Distribution[Double], samples: Int) = {
     println()
     println("Original distribution:")
-    d.plotBucketedHist(20)
+    d.bucketedHist(20)
 
     println()
     val stdev = d.stdev
@@ -655,7 +655,7 @@ object Examples {
     println()
     println("Distribution of means of samples of size %d:".format(samples))
     val sd = d.repeat(samples).map(xs => xs.sum / samples)
-    sd.plotBucketedHist(20)
+    sd.bucketedHist(20)
 
     println()
     println("This distribution is always a normal distribution regardless of the shape of the original distribution.")
@@ -678,7 +678,7 @@ object Examples {
     println()
     println("Distribution of pr(b = true) of samples of size %d:".format(samples))
     val sd = d.repeat(samples).map(xs => xs.count(x => x).toDouble / samples)
-    sd.plotBucketedHist(20)
+    sd.bucketedHist(20)
 
     println()
     println("This distribution is always a normal distribution.")
@@ -696,7 +696,7 @@ object Examples {
   def centralLimitTheorem3(d1: Distribution[Double], d2: Distribution[Double], samples1: Int, samples2: Int) = {
     println()
     println("Original distribution 1:")
-    d1.plotBucketedHist(20)
+    d1.bucketedHist(20)
 
     println()
     val mean1 = d1.mean
@@ -706,7 +706,7 @@ object Examples {
 
     println()
     println("Original distribution 2:")
-    d2.plotBucketedHist(20)
+    d2.bucketedHist(20)
     println()
     val mean2 = d2.mean
     val stdev2 = d2.stdev
@@ -718,7 +718,7 @@ object Examples {
     val sd1 = d1.repeat(samples1).map(xs => xs.sum / xs.size)
     val sd2 = d2.repeat(samples2).map(xs => xs.sum / xs.size)
     val sd = sd1 - sd2
-    sd.plotBucketedHist(20)
+    sd.bucketedHist(20)
 
     println()
     println("This distribution is always a normal distribution regardless of the shapes of the original distributions.")
