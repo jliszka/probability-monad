@@ -250,6 +250,7 @@ object Distribution {
     val scale = len / weightedValues.map(_._2).sum
     val scaled = weightedValues.map{ case (a, p) => (a, p * scale) }.toList
     val (smaller, bigger) = scaled.partition(_._2 < 1.0)
+    // The alias method: http://www.keithschwarz.com/darts-dice-coins/
     private def alias(smaller: List[(A, Double)], bigger: List[(A, Double)]): List[(A, Double, Option[A])] = {
       smaller match {
         case Nil => bigger.map{ case (a, _) => (a, 1.0, None) }
@@ -355,6 +356,44 @@ object Distribution {
     for {
       y <- exponential(1)
     } yield l * math.pow(y, 1/k)
+  }
+
+  def gamma(k: Double, theta: Double): Distribution[Double] = {
+    val n = k.toInt
+    val gammaInt = uniform.repeat(n).map(_.map(x => -math.log(x)).sum)
+    val gammaFrac = {
+      val delta = k - n
+      // From https://en.wikipedia.org/wiki/Gamma_distribution#Generating_gamma-distributed_random_variables
+      def helper(): Distribution[Double] = {
+        for {
+          u1 <- uniform
+          u2 <- uniform
+          u3 <- uniform
+          (zeta, eta) = {
+            val v0 = math.E / (math.E + delta)
+            if (u1 <= v0) {
+              val zeta = math.pow(u2, 1/delta)
+              val eta = u3 * math.pow(zeta, delta - 1)
+              (zeta, eta)
+            } else {
+              val zeta = 1 - math.log(u2)
+              val eta = u3 * math.exp(-zeta)
+              (zeta, eta)
+            }
+          }
+          r <- if (eta > math.pow(zeta, delta - 1) * math.exp(-zeta)) helper() else always(zeta)
+        } yield r
+      }
+      helper()
+    }
+    (gammaInt + gammaFrac) * theta
+  }
+
+  def beta(a: Double, b: Double): Distribution[Double] = {
+    for {
+      x <- gamma(a, 1)
+      y <- gamma(b, 1)
+    } yield x / (x + y)
   }
 
   /**

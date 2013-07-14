@@ -160,6 +160,8 @@ for creating and manipulating probability distributions. Built-in distributions 
 - exponential
 - lognormal
 - student's t-distribution
+- gamma
+- beta
 
 Methods for manipulating distributions include:
 
