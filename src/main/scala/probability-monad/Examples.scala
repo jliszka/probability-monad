@@ -105,8 +105,8 @@ object Examples {
     if (a <= 1 || d == 0) always((a, d))
     else {
       for {
-	r <- attack(a-1, d)
-	s <- attacks(a - (2 - r), d - r)
+        r <- attack(a-1, d)
+        s <- attacks(a - (2 - r), d - r)
       } yield s
     }
   }

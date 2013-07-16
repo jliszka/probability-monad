@@ -51,7 +51,7 @@ Or: Each family has children until it has a boy, and then stops. What is the exp
 ## How it works
 
 A ```Distribution[T]``` represents a random variable that, when sampled, produces values of type ```T``` according
-to a particular probability distribution. For example, ```Distribution.uniform()``` is a ```Distribution[Double]```
+to a particular probability distribution. For example, ```Distribution.uniform``` is a ```Distribution[Double]```
 that produces ```Double``` values between 0.0 and 1.0, uniformly distributed. ```Distribution.coin``` is a 
 ```Distribution[Coin]``` that produces the values ```H``` and ```T``` with equal probability, and
 ```Distribution.biasedCoin(0.3)``` is a ```Distribution[Coin]``` that produces the value ```H``` 30% of the time
@@ -67,7 +67,7 @@ distributions. For example, here's how you would create a distribution that repr
     } yield d1 + d2
 
 Here, ```die``` is a ```Distribution[Int]```, and ```d1``` and ```d2``` are both ```Int```s. The type of ```dice```
-is ```Distribution[Int]```. You can see that for-comprehensions let you define new a distribution in terms of individual
+is ```Distribution[Int]```. You can see that for-comprehensions are an easy way to define new a distribution in terms of individual
 samples from other distributions.
 
 You can visualize a distribution with ```hist```:

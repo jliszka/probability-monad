@@ -198,10 +198,11 @@ trait Distribution[A] {
     val rm = BigDecimal.RoundingMode.HALF_UP
     val width = (max - min) / nbuckets
     def toBucket(a: A): BigDecimal = ((toDouble(a) - min) / width).setScale(0, rm) * width + min
-    val bucketed = data
+    val n = data.size
+    val bucketToProb = data
       .groupBy(toBucket)
-      .mapValues(_.size.toDouble / N)
-      .toList.sortBy(_._1)
+      .mapValues(_.size.toDouble / n)
+    val bucketed = (min to max by width).map(a => a -> bucketToProb.getOrElse(a, 0.0))
     doPlot(bucketed)
   }
 
