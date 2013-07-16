@@ -17,6 +17,7 @@ object Examples {
     } yield CoinTrial(haveFairCoin, flips)
   }
   def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
+  def runBayesianCoin2(flips: Int) = tf().posterior(p => (if (p) coin else biasedCoin(0.9)).repeat(flips))(_.forall(_ == H)).hist
 
 
   /**
@@ -65,28 +66,19 @@ object Examples {
    */
 
   def unknownBiasedCoin(prior: Distribution[Double], nflips: Int, successes: Int): Distribution[Double] = {
-    case class Trial(p: Double, successes: Int)
+    case class Trial(p: Double, flips: List[Coin])
     val d = for {
       p <- prior
-      flips <- tf(p).repeat(nflips)
-    } yield Trial(p, flips.count(b => b))
-    d.filter(_.successes == successes).map(_.p)
+      flips <- biasedCoin(p).repeat(nflips)
+    } yield Trial(p, flips)
+    d.filter(_.flips.count(_ == H) == successes).map(_.p)
   }
+  def runUnknownBiasedCoin = unknownBiasedCoin(uniform, 10, 8).bucketedHist(0, 1, 20)
 
-  /**
-   * Given a distribution `dist` with unknown parameter of type `A`, and a prior distribution `prior` of that parameter,
-   * and given the `evidence` after conducting a `trial` using `dist`, what is the posterior distribution of the parameter?
-   */
-
-  def posterior[A, B, C](prior: Distribution[A])(dist: A => Distribution[B])(trial: Distribution[B] => Distribution[C])(evidence: C): Distribution[A] = {
-    case class Trial(p: A, evidence: C)
-    val d = for {
-      p <- prior
-      c <- trial(dist(p))
-    } yield Trial(p, c)
-    d.filter(_.evidence == evidence).map(_.p)
+  def unknownBiasedCoin2(prior: Distribution[Double], nflips: Int, successes: Int): Distribution[Double] = {
+    prior.posterior(p => biasedCoin(p).repeat(nflips))(_.count(_ == H) == successes)
   }
-
+  def runUnknownBiasedCoin2 = unknownBiasedCoin2(uniform, 10, 8).bucketedHist(0, 1, 20)
 
   /**
    * RISK

@@ -42,6 +42,19 @@ trait Distribution[A] {
 
   def repeat(n: Int): Distribution[List[A]] = until(_.length == n)
 
+  /**
+   * Using this distribution as a prior, compute the posterior distribution after running an experiment
+   * and observing some outcomes and not others.
+   */
+  def posterior[B](experiment: A => Distribution[B])(observed: B => Boolean): Distribution[A] = {
+    case class Trial(p: A, evidence: B)
+    val d = for {
+      p <- this
+      e <- experiment(p)
+    } yield Trial(p, e)
+    d.filter(t => observed(t.evidence)).map(_.p)
+  }
+
   @tailrec
   final def iterate(n: Int, f: A => Distribution[A]): Distribution[A] = {
     if (n == 0) this
