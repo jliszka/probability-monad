@@ -17,7 +17,10 @@ object Examples {
     } yield CoinTrial(haveFairCoin, flips)
   }
   def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
-  def runBayesianCoin2(flips: Int) = tf().posterior(p => (if (p) coin else biasedCoin(0.9)).repeat(flips))(_.forall(_ == H)).hist
+  def bayesianCoin2(nflips: Int) = {
+    tf().posterior(p => (if (p) coin else biasedCoin(0.9)).repeat(nflips))(_.forall(_ == H))
+  }
+  def runBayesianCoin2 = bayesianCoin2(10).hist
 
 
   /**
@@ -755,4 +758,32 @@ object Examples {
   }
 
   def runCentralLimitTheorem3 = centralLimitTheorem3(normal, uniform, 100, 200)
+
+  def runKSTest {
+    println("The Kolmogorov-Smirnov test. Values over 1.95 indicate that the distributions are probably different.")
+    println()
+    println("comparing 2 normal distributions: " + ksTest(normal, normal))
+    println("comparing a normal and a shifted normal distribution: " + ksTest(normal, normal + 0.1))
+    println("comparing a normal and a scaled normal distribution: " + ksTest(normal, normal * 1.2))
+    val d1 = unknownBiasedCoin2(uniform, 10, 8)
+    val d2 = unknownBiasedCoin2(unknownBiasedCoin2(uniform, 5, 3), 5, 5)
+    println("comparing 2 different ways of arriving at what should be the same posterior distribution: " + ksTest(d1, d2))
+    println("comparing beta(1, 1) and uniform: " + ksTest(beta(1, 1), uniform))
+    val p1 = 0.3
+    val p2 = 0.4
+    val geoMin = geometric(p1).flatMap(x1 => geometric(p2).map(x2 => x1 min x2))
+    println("comparing min(geometric(p1), geometric(p2)) with geometric(p1+p2-p1*p2): " + ksTest(geoMin, geometric(p1+p2-p1*p2)))
+    println("comparing beta(1, 1) with a uniform distribution: " + ksTest(uniform, beta(1, 1)))
+    println("comparing beta(5, 5) with an appropriately scaled and shifted normal distribution: " + testBetaApproximatesNormal(5, 5))
+    println("comparing beta(100, 100) with an appropriately scaled and shifted normal distribution: " + testBetaApproximatesNormal(100, 100))
+    println("comparing beta(1, 100)*100 with exponential(1): " + ksTest(exponential(1), beta(1, 100)*100))
+    println("comparing gamma(a, 2) with chi2(2a): " + ksTest(gamma(4, 2), chi2(8)))
+    println("comparing gamma(a, 2) with chi2(2a+1) (expected to be different): " + ksTest(gamma(4, 2), chi2(9)))
+  }
+
+  def testBetaApproximatesNormal(a: Int, b: Int): Double = {
+    val mean = a.toDouble / (a + b)
+    val stdev = math.sqrt(a.toDouble * b / ((a + b) * (a + b) * (a + b + 1)))
+    ksTest(beta(a, b), normal * stdev + mean)
+  }
 }

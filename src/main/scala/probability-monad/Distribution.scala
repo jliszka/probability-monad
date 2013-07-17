@@ -165,12 +165,8 @@ trait Distribution[A] {
     }
   }
 
-  def histData = {
-    this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
-  }
-
   private def plotHist(implicit ord: Ordering[A] = null) {
-    val histogram = this.histData.toList
+    val histogram = this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
     val sorted = if (ord == null) histogram else histogram.sortBy(_._1)(ord)
     doPlot(sorted)
   }
@@ -420,5 +416,21 @@ object Distribution {
 
   def markov[A](init: Distribution[A])(stop: A => Boolean, transition: A => Distribution[A]): Distribution[A] = {
     init.iterateUntil(stop, transition)
+  }
+
+  /**
+   * Tests if two probability distributions are the same using the Kolmogorov-Smirnov test.
+   * The distributions are unlikely to be the same (p < 0.05) if the value is greater than 1.35
+   * and very unlikely (p < 0.001) if the value is greater than 1.95.
+   */
+  def ksTest[A](d1: Distribution[A], d2: Distribution[A])(implicit ord: Ordering[A]): Double = {
+    val n = 100000
+    val d1s = d1.sample(n).sorted.zipWithIndex
+    val d2s = d2.sample(n).sorted.zipWithIndex
+    val all = (d1s ++ d2s).sorted.zipWithIndex
+    // 2i is the expected index in the combined list and j is the actual index.
+    val worstOffset = all.map{ case ((x, i), j) => math.abs(2 * i - j) }.max / 2
+    val ksStatistic = worstOffset.toDouble / n
+    ksStatistic / math.sqrt(2.0 * n / (n * n))
   }
 }
