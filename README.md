@@ -141,7 +141,7 @@ This probability monad is based on sampling, so the values and plots produced wi
 
 # Code and examples
 
-[Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/Distribution.scala) contains code
+[Distribution.scala](https://github.com/jliszka/probability-monad/blob/master/src/main/scala/probability-monad/Distribution.scala) contains code
 for creating and manipulating probability distributions. Built-in distributions include:
 
 - uniform discrete (including die and fair coin)
@@ -173,7 +173,7 @@ Methods for manipulating distributions include:
 - finding expected values (mean), standard deviation, variance, skewness and kurtosis
 - sampling, histogram
 
-[Examples.scala](https://github.com/jliszka/probability-monad/blob/master/Examples.scala) contains some 
+[Examples.scala](https://github.com/jliszka/probability-monad/blob/master/src/main/scala/probability-monad/Examples.scala) contains some 
 example uses, and possibly a RISK simulator.
 
 To try out some examples, do
