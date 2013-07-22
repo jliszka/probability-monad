@@ -165,8 +165,12 @@ trait Distribution[A] {
     }
   }
 
+  def histData = {
+    this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
+  }
+
   private def plotHist(implicit ord: Ordering[A] = null) {
-    val histogram = this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
+    val histogram = this.histData.toList
     val sorted = if (ord == null) histogram else histogram.sortBy(_._1)(ord)
     doPlot(sorted)
   }
