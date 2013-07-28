@@ -45,7 +45,7 @@ object Examples {
       case Well => tf(0.019)
     }
     val prevalence = 0.00448
-    val person = discrete(List(Sick -> prevalence, Well -> (1-prevalence)))
+    val person = discrete(Sick -> prevalence, Well -> (1-prevalence))
     for {
       p <- person
       r <- test(p)
@@ -150,7 +150,7 @@ object Examples {
 
   def queue(loadFactor: Double): Distribution[Int] = {
     val incoming = poisson(loadFactor)
-    markov(always(0), 100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
+    always(0).markov(100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
   }
   def runBank = queue(0.9).map(_.toDouble).ev
 
@@ -161,7 +161,7 @@ object Examples {
    */
 
   def dieSum(rolls: Int): Distribution[List[Int]] = {
-    markov(always(List(0)), rolls)(runningSum => for {
+    always(List(0)).markov(rolls)(runningSum => for {
       d <- die
     } yield (d + runningSum.head) :: runningSum)
   }
@@ -173,7 +173,7 @@ object Examples {
    */
 
   def randomWalk(target: Int, maxSteps: Int): Distribution[List[Int]] = {
-    markov(always(List(0)))(steps => steps.head == target || steps.length == maxSteps, positions => for {
+    always(List(0)).markov(steps => steps.head == target || steps.length == maxSteps)(positions => for {
       direction <- discreteUniform(List(-1, 1))
     } yield (positions.head + direction) :: positions)
   }
@@ -184,7 +184,7 @@ object Examples {
    */
 
   def pascal(depth: Int): Distribution[(Int, Int)] = {
-    markov(always((0, 0)), depth){ case (left, right) => for {
+    always((0, 0)).markov(depth){ case (left, right) => for {
       moveLeft <- tf()
     } yield {
       if (moveLeft) (left+1, right) else (left, right+1)
@@ -192,6 +192,21 @@ object Examples {
   }
   def runPascal = pascal(6).hist
 
+  /**
+   * Given a Markov model for the weather, if it is rainy on thursday, what
+   * was the likely weather on monday?
+   */
+  def weather = {
+    def transition(rain: Boolean): Distribution[Boolean] = rain match {
+      case true => discrete(true -> 0.5, false -> 0.5)
+      case false => discrete(true -> 0.1, false -> 0.9)
+    }
+    for {
+      monday <- tf()
+      thursday <- always(monday).markov(3)(transition)
+    } yield (monday, thursday)
+  }
+  def runWeather = weather.given{ case (monday, thursday) => thursday }.map(_._1)
 
   /**
    * Simpson's Paradox
@@ -208,8 +223,8 @@ object Examples {
   def simpson(): Distribution[(Party, State, Boolean)] = {
 
     def stateToParty(state: State) = state match {
-      case North => discrete(List(Democrat -> 154.0, Republican -> 162.0))
-      case South => discrete(List(Democrat -> 94.0, Republican -> 1.0))
+      case North => discrete(Democrat -> 154.0, Republican -> 162.0)
+      case South => discrete(Democrat -> 94.0, Republican -> 1.0)
     }
 
     def votedFor(party: Party, state: State): Distribution[Boolean] = {
@@ -220,12 +235,12 @@ object Examples {
         case (Republican, South) => tf(0.01)
       }
     }
-    val senators = discrete(List(
+    val senators = discrete(
       (Democrat, North) -> 154.0,
       (Democrat, South) -> 94.0,
       (Republican, North) -> 162.0,
       (Republican, South) -> 1.0
-    ))
+    )
     for {
       (party, state) <- senators
       vote <- votedFor(party, state)

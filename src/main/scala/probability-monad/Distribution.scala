@@ -33,14 +33,17 @@ trait Distribution[A] {
     override def get = {
       @tailrec
       def helper(sofar: List[A]): List[A] = {
-	if (pred(sofar)) sofar
-	else helper(self.get :: sofar)
+        if (pred(sofar)) sofar
+        
+        else helper(self.get :: sofar)
       }
       helper(Nil)
     }
   }
 
-  def repeat(n: Int): Distribution[List[A]] = until(_.length == n)
+  def repeat(n: Int): Distribution[List[A]] = new Distribution[List[A]] {
+    override def get = List.fill(n)(self.get)
+  }
 
   /**
    * Using this distribution as a prior, compute the posterior distribution after running an experiment
@@ -55,13 +58,17 @@ trait Distribution[A] {
     d.filter(t => observed(t.evidence)).map(_.p)
   }
 
+  /**
+   * Markov chains
+   */
+
   @tailrec
-  final def iterate(n: Int, f: A => Distribution[A]): Distribution[A] = {
+  final def markov(n: Int)(f: A => Distribution[A]): Distribution[A] = {
     if (n == 0) this
-    else this.flatMap(f).iterate(n-1, f)
+    else this.flatMap(f).markov(n-1)(f)
   }
 
-  def iterateUntil(pred: A => Boolean, f: A => Distribution[A]): Distribution[A] = new Distribution[A] {
+  def markov(pred: A => Boolean)(f: A => Distribution[A]): Distribution[A] = new Distribution[A] {
     override def get = {
       @tailrec
       def helper(a: A): A = {
@@ -245,13 +252,13 @@ object Distribution {
   case object H extends Coin
   case object T extends Coin
   def coin: Distribution[Coin] = discreteUniform(List(H, T))
-  def biasedCoin(p: Double): Distribution[Coin] = discrete(List(H -> p, T -> (1-p)))
+  def biasedCoin(p: Double): Distribution[Coin] = discrete(H -> p, T -> (1-p))
 
   def d(n: Int) = discreteUniform(1 to n)
   def die = d(6)
   def dice(n: Int) = die.repeat(n)
   
-  def tf(p: Double = 0.5) = discrete(List(true -> p, false -> (1-p)))
+  def tf(p: Double = 0.5) = discrete(true -> p, false -> (1-p))
   def bernoulli(p: Double = 0.5) = tf(p)
 
   def discreteUniform[A](values: Iterable[A]): Distribution[A] = new Distribution[A] {
@@ -259,7 +266,7 @@ object Distribution {
     override def get = vec(rand.nextInt(vec.length))
   }
 
-  def discrete[A](weightedValues: Iterable[(A, Double)]): Distribution[A] = new Distribution[A] {
+  def discrete[A](weightedValues: (A, Double)*): Distribution[A] = new Distribution[A] {
     val len = weightedValues.size
     val scale = len / weightedValues.map(_._2).sum
     val scaled = weightedValues.map{ case (a, p) => (a, p * scale) }.toList
@@ -309,7 +316,7 @@ object Distribution {
   }
 
   def zipf(s: Double, n: Int): Distribution[Int] = {
-    discrete((1 to n).map(k => k -> 1.0 / math.pow(k, s)))
+    discrete((1 to n).map(k => k -> 1.0 / math.pow(k, s)): _*)
   }
 
   /**
@@ -408,18 +415,6 @@ object Distribution {
       x <- gamma(a, 1)
       y <- gamma(b, 1)
     } yield x / (x + y)
-  }
-
-  /**
-   * Markov chains
-   */
-
-  def markov[A](init: Distribution[A], steps: Int)(transition: A => Distribution[A]): Distribution[A] = {
-    init.iterate(steps, transition)
-  }
-
-  def markov[A](init: Distribution[A])(stop: A => Boolean, transition: A => Distribution[A]): Distribution[A] = {
-    init.iterateUntil(stop, transition)
   }
 
   /**
