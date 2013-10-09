@@ -774,6 +774,13 @@ object Examples {
     println("stdev = sqrt( stdev1^2 / n1 + stdev2^2 / n2 ) = " + math.sqrt(stdev1 * stdev1 / samples1 + stdev2 * stdev2 / samples2))
   }
 
+  def differenceOfMeans(d1: Distribution[Double], d2: Distribution[Double], n1: Int, n2: Int): Distribution[Double] = {
+    for {
+      mean1 <- d1.repeat(n1).map(_.sum / n1)
+      mean2 <- d2.repeat(n2).map(_.sum / n2)
+    } yield mean2 - mean1
+  }
+
   def runCentralLimitTheorem3 = centralLimitTheorem3(normal, uniform, 100, 200)
 
   def runKSTest {
