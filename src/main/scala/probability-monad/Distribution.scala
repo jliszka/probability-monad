@@ -172,7 +172,7 @@ trait Distribution[A] {
     }
   }
 
-  def histData = {
+  def histData: Map[A, Double] = {
     this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
   }
 
@@ -196,26 +196,26 @@ trait Distribution[A] {
     (outerMin, outerMax, bestWidth, actualBuckets)
   }
 
-  def bucketedHist(buckets: Int = 20)(implicit ord: Ordering[A], toDouble: A <:< Double) {
+  def bucketedHist(buckets: Int)(implicit ord: Ordering[A], toDouble: A <:< Double) {
     val data = this.sample(N).toList.sorted
     val min = data.head
     val max = data.last
     val (outerMin, outerMax, width, nbuckets) = findBucketWidth(toDouble(min), toDouble(max), buckets)
-    bucketedHistHelper(outerMin, outerMax, nbuckets, data)(ord, toDouble)
+    bucketedHistHelper(outerMin, outerMax, nbuckets, data, roundDown = false)(ord, toDouble)
   }
 
-  def bucketedHist(min: Double, max: Double, nbuckets: Int)
+  def bucketedHist(min: Double, max: Double, nbuckets: Int, roundDown: Boolean = false)
                   (implicit ord: Ordering[A], toDouble: A <:< Double) {
     val data = this.sample(N).toList.sorted.filter(a => {
       val x = toDouble(a)
       min <= x && x <= max
     })
-    bucketedHistHelper(BigDecimal(min), BigDecimal(max), nbuckets, data)(ord, toDouble)
+    bucketedHistHelper(BigDecimal(min), BigDecimal(max), nbuckets, data, roundDown)(ord, toDouble)
   }
 
-  private def bucketedHistHelper(min: BigDecimal, max: BigDecimal, nbuckets: Int, data: List[A])
+  private def bucketedHistHelper(min: BigDecimal, max: BigDecimal, nbuckets: Int, data: List[A], roundDown: Boolean)
                   (implicit ord: Ordering[A], toDouble: A <:< Double) {
-    val rm = BigDecimal.RoundingMode.HALF_UP
+    val rm = if (roundDown) BigDecimal.RoundingMode.DOWN else BigDecimal.RoundingMode.HALF_UP
     val width = (max - min) / nbuckets
     def toBucket(a: A): BigDecimal = ((toDouble(a) - min) / width).setScale(0, rm) * width + min
     val n = data.size
@@ -259,7 +259,8 @@ object Distribution {
   def dice(n: Int) = die.repeat(n)
   
   def tf(p: Double = 0.5) = discrete(true -> p, false -> (1-p))
-  def bernoulli(p: Double = 0.5) = tf(p)
+
+  def bernoulli(p: Double = 0.5) = discrete(1 -> p, 0 -> (1-p))
 
   def discreteUniform[A](values: Iterable[A]): Distribution[A] = new Distribution[A] {
     private val vec = Vector() ++ values
@@ -300,19 +301,15 @@ object Distribution {
   }
 
   def binomial(p: Double, n: Int): Distribution[Int] = {
-    tf(p).repeat(n).map(_.count(b => b))
+    bernoulli(p).repeat(n).map(_.sum)
   }
 
   def negativeBinomial(p: Double, r: Int): Distribution[Int] = {
-    tf(p).until(_.count(b => !b) == r).map(_.size - r)
+    tf(p).until(_.count(_ == false) == r).map(_.size - r)
   }
 
-  def poisson(lambda: Double): Distribution[Int] = new Distribution[Int] {
-    override def get = {
-      val m = math.exp(-lambda)
-      val s = Stream.iterate(1.0)(_ * uniform.get)
-      s.tail.takeWhile(_ > m).length
-    }
+  def poisson(lambda: Double): Distribution[Int] = {
+    exponential(1).until(_.sum > lambda).map(_.size - 1)
   }
 
   def zipf(s: Double, n: Int): Distribution[Int] = {
