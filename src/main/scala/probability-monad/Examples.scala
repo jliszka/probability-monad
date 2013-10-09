@@ -650,35 +650,37 @@ object Examples {
            println("  %s: %.2f%%".format(e2.toString, pr / total * 100))
          }}
      }}
+     println()
+     println("independent with probability %.2f%%".format(chi2test(p.map(x => (e1(x), e2(x)))) * 100))
   }
 
   def doPGM {
     println()
-    println("X and Y are independent: p(y|x) = ")
+    println("** X and Y are independent: p(y|x) = ")
     dep(pgm)(_.x, _.y)
 
     println()
-    println("Given knowledge of Z, X and Y are dependent: p(y|x, z=true) = ")
+    println("** Given knowledge of Z, X and Y are dependent: p(y|x, z=true) = ")
     dep(pgm.filter(_.z == true))(_.x, _.y)
 
     println()
-    println("Given knowledge of W, X and Y are dependent: p(y|x, w=false) = ")
+    println("** Given knowledge of W, X and Y are dependent: p(y|x, w=false) = ")
     dep(pgm.filter(_.w == false))(_.x, _.y)
 
     println()
-    println("X and W are dependent: p(w|x) = ")
+    println("** X and W are dependent: p(w|x) = ")
     dep(pgm)(_.x, _.w)
 
     println()
-    println("Given knowledge of Z, X and W are independent: p(w|x, z=true) = ")
+    println("** Given knowledge of Z, X and W are independent: p(w|x, z=true) = ")
     dep(pgm.filter(_.z == true))(_.x, _.w)
 
     println()
-    println("Z and Q are dependent: p(q|z) = ")
+    println("** Z and Q are dependent: p(q|z) = ")
     dep(pgm)(_.z, _.q)
 
     println()
-    println("Given knowledge of Y, Z and Q are independent: p(q|z, y=true) = ")
+    println("** Given knowledge of Y, Z and Q are independent: p(q|z, y=true) = ")
     dep(pgm.filter(_.y == true))(_.z, _.q)
   }
 

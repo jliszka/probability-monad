@@ -432,4 +432,38 @@ object Distribution {
     val ksStatistic = worstOffset.toDouble / n
     ksStatistic / math.sqrt(2.0 * n / (n * n))
   }
+
+  /**
+   * Determine if a joint probability distribution is composed of 2 independent events.
+   * Uses the G-test: http://en.wikipedia.org/wiki/G-test
+   */
+  def chi2test[A, B](d: Distribution[(A, B)]): Double = {
+    val data = d.histData
+    val total = data.map(_._2).sum
+    val rowValues = data.map(_._1._1).toSet
+    val colValues = data.map(_._1._2).toSet
+
+    val rowTotals = (for {
+      row <- rowValues
+    } yield row -> colValues.map(col => data.getOrElse((row, col), 0.0)).sum).toMap
+
+    val colTotals = (for {
+      col <- colValues
+    } yield col -> rowValues.map(row => data.getOrElse((row, col), 0.0)).sum).toMap
+
+    val chi2stat = (for {
+      row <- rowValues
+      col <- colValues
+    } yield {
+      val observed = data.getOrElse((row, col), 0.0)
+      val expected = {
+        val rowTotal = rowTotals.getOrElse(row, 0.0)
+        val colTotal = colTotals.getOrElse(col, 0.0)
+        rowTotal.toDouble * colTotal / total
+      }
+      observed * math.log(observed / expected)
+    }).sum * 2
+    val df = (rowValues.size - 1) * (colValues.size - 1)
+    chi2(df).pr(_ > chi2stat)
+  }
 }
