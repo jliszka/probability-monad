@@ -414,6 +414,17 @@ object Distribution {
     } yield x / (x + y)
   }
 
+  def sequence[T](ds: List[Distribution[T]]): Distribution[List[T]] = new Distribution[List[T]] {
+    override def get = ds.map(_.get)
+  }
+
+  def dirichlet(alphas: List[Double]): Distribution[List[Double]] = {
+    sequence(alphas.map(a => gamma(a, 1))).map(ys => {
+      val sum = ys.sum
+      ys.map(_ / sum)
+    })
+  }
+
   /**
    * Tests if two probability distributions are the same using the Kolmogorov-Smirnov test.
    * The distributions are unlikely to be the same (p < 0.05) if the value is greater than 1.35
