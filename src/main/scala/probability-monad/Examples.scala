@@ -338,22 +338,21 @@ object Examples {
   }
 
   val bloodPrior: Distribution[(BloodGene, BloodGene)] = {
+    val geneFrequencies = discrete(A_ -> 0.26, B_ -> 0.08, O_ -> 0.66)
     for {
-      g1 <- discreteUniform(List(A_, B_, O_))
-      g2 <- discreteUniform(List(A_, B_, O_))
+      g1 <- geneFrequencies
+      g2 <- geneFrequencies
     } yield (g1, g2)
   }
 
   def typeFromGene(g: (BloodGene, BloodGene)): Distribution[BloodType] = {
     g match {
-      case (A_, A_) => always(A)
       case (A_, B_) => always(AB)
-      case (A_, O_) => always(A)
       case (B_, A_) => always(AB)
-      case (B_, B_) => always(B)
-      case (B_, O_) => always(B)
-      case (O_, A_) => always(A)
-      case (O_, B_) => always(B)
+      case (A_, _) => always(A)
+      case (_, A_) => always(A)
+      case (B_, _) => always(B)
+      case (_, B_) => always(B)
       case (O_, O_) => always(O)
     }
   }
@@ -367,24 +366,23 @@ object Examples {
     } yield (p1, p2))
   }
 
-  case class BloodTrial(bart: BloodType, lisa: BloodType, homer: BloodType, marge: BloodType, selma: BloodType, jackie: BloodType)
+  case class BloodTrial(lisa: BloodType, homer: BloodType, marge: BloodType, selma: BloodType, jackie: BloodType, harry: BloodType)
   val bloodType = for {
     gHomer <- bloodPrior
-    bHomer <- typeFromGene(gHomer)
     gHarry <- bloodPrior
     gJackie <- bloodPrior
-    bJackie <- typeFromGene(gJackie)
     gSelma <- childFromParents(gHarry, gJackie)
-    bSelma <- typeFromGene(gSelma)
     gMarge <- childFromParents(gHarry, gJackie)
-    bMarge <- typeFromGene(gMarge)
-    gBart <- childFromParents(gHomer, gMarge)
-    bBart <- typeFromGene(gBart)
     gLisa <- childFromParents(gHomer, gMarge)
     bLisa <- typeFromGene(gLisa)
-  } yield BloodTrial(bBart, bLisa, bHomer, bMarge, bSelma, bJackie)
+    bHomer <- typeFromGene(gHomer)
+    bMarge <- typeFromGene(gMarge)
+    bSelma <- typeFromGene(gSelma)
+    bJackie <- typeFromGene(gJackie)
+    bHarry <- typeFromGene(gHarry)
+  } yield BloodTrial(bLisa, bHomer, bMarge, bSelma, bJackie, bHarry)
 
-  def runBloodType = bloodType.filter(_.selma == A).pr(_.bart == A)
+  def runBloodType = bloodType.filter(_.selma == A).pr(_.lisa == A)
 
   /**
    * Teasing apart correlation and causality.
