@@ -34,7 +34,7 @@ trait Distribution[A] {
       @tailrec
       def helper(sofar: List[A]): List[A] = {
         if (pred(sofar)) sofar
-        
+
         else helper(self.get :: sofar)
       }
       helper(Nil)
@@ -78,7 +78,7 @@ trait Distribution[A] {
       helper(self.get)
     }
   }
-  
+
   private val N = 10000
 
   def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = N): Double = {
@@ -233,7 +233,7 @@ trait Distribution[A] {
     data.foreach{ case (a, p) => {
       val hashes = (p * scale).toInt
       println(fmt.format(a.toString, p*100, "#" * hashes))
-    }}    
+    }}
   }
 }
 
@@ -257,7 +257,7 @@ object Distribution {
   def d(n: Int) = discreteUniform(1 to n)
   def die = d(6)
   def dice(n: Int) = die.repeat(n)
-  
+
   def tf(p: Double = 0.5) = discrete(true -> p, false -> (1-p))
 
   def bernoulli(p: Double = 0.5) = discrete(1 -> p, 0 -> (1-p))
@@ -273,18 +273,22 @@ object Distribution {
     val scaled = weightedValues.map{ case (a, p) => (a, p * scale) }.toList
     val (smaller, bigger) = scaled.partition(_._2 < 1.0)
     // The alias method: http://www.keithschwarz.com/darts-dice-coins/
-    private def alias(smaller: List[(A, Double)], bigger: List[(A, Double)]): List[(A, Double, Option[A])] = {
+    @tailrec
+    private def alias(smaller: List[(A, Double)], bigger: List[(A, Double)], rest: List[(A, Double, Option[A])]): List[(A, Double, Option[A])] = {
       smaller match {
-        case Nil => bigger.map{ case (a, _) => (a, 1.0, None) }
+        case Nil => bigger.map{ case (a, _) => (a, 1.0, None) } ++ rest
         case (s, sp)::ss => {
           val (b, pb)::bb = bigger
           val remainder = (b, pb - (1.0 - sp))
-          val rest = if (remainder._2 < 0.9999) alias(remainder :: ss, bb) else alias(ss, remainder :: bb)
-          (s, sp, Some(b)) :: rest
+          val newRest = (s, sp, Some(b)) :: rest
+          if (remainder._2 < 0.9999)
+            alias(remainder :: ss, bb, newRest)
+          else
+            alias(ss, remainder :: bb, newRest)
         }
       }
     }
-    val table = Vector() ++ alias(smaller, bigger)
+    val table = Vector() ++ alias(smaller, bigger, Nil)
     private def select(p1: Double, p2: Double, table: Vector[(A, Double, Option[A])]): A = {
       table((p1 * len).toInt) match {
         case (a, _, None) => a
