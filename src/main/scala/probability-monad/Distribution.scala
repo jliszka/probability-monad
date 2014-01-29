@@ -272,20 +272,24 @@ object Distribution {
     val scale = len / weightedValues.map(_._2).sum
     val scaled = weightedValues.map{ case (a, p) => (a, p * scale) }.toList
     val (smaller, bigger) = scaled.partition(_._2 < 1.0)
+
     // The alias method: http://www.keithschwarz.com/darts-dice-coins/
     @tailrec
     private def alias(smaller: List[(A, Double)], bigger: List[(A, Double)], rest: List[(A, Double, Option[A])]): List[(A, Double, Option[A])] = {
-      smaller match {
-        case Nil => bigger.map{ case (a, _) => (a, 1.0, None) } ++ rest
-        case (s, sp)::ss => {
-          val (b, pb)::bb = bigger
+      (smaller, bigger) match {
+        case ((s, sp) :: ss, (b, pb) :: bb) =>
           val remainder = (b, pb - (1.0 - sp))
           val newRest = (s, sp, Some(b)) :: rest
-          if (remainder._2 < 0.9999)
+          if (remainder._2 < 1)
             alias(remainder :: ss, bb, newRest)
           else
             alias(ss, remainder :: bb, newRest)
-        }
+        case (_, (b, pb) :: bb) =>
+          alias(smaller, bb, (b, 1.0, None) :: rest)
+        case ((s, sp) :: ss, _) =>
+          alias(ss, bigger, (s, 1.0, None) :: rest)
+        case _ =>
+          rest
       }
     }
     val table = Vector() ++ alias(smaller, bigger, Nil)
