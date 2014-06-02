@@ -12,7 +12,7 @@ object Examples {
   def bayesianCoin(nflips: Int): Distribution[CoinTrial] = {
     for {
       haveFairCoin <- tf()
-      val c = if (haveFairCoin) coin else biasedCoin(0.9)
+      c = if (haveFairCoin) coin else biasedCoin(0.9)
       flips <- c.repeat(nflips)
     } yield CoinTrial(haveFairCoin, flips)
   }
@@ -137,7 +137,7 @@ object Examples {
   def population(families: Int): Distribution[Double] = {
     for {
       children <- family.repeat(families).map(_.flatten)
-      val girls = children.count(_ == Girl)
+      girls = children.count(_ == Girl)
     } yield girls.toDouble / children.length
   }
   def runBoyGirl = population(4).ev

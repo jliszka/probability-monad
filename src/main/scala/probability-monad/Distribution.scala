@@ -1,6 +1,5 @@
 package probability_monad
 
-import java.math.MathContext
 import scala.annotation.tailrec
 import scala.math.BigDecimal
 import scala.util.Random
@@ -26,6 +25,8 @@ trait Distribution[A] {
       if (pred(s)) s else this.get
     }
   }
+
+  def withFilter(pred: A => Boolean): Distribution[A] = filter(pred)
 
   def given(pred: A => Boolean): Distribution[A] = filter(pred)
 
