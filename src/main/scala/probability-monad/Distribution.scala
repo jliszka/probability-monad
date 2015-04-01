@@ -86,7 +86,7 @@ trait Distribution[A] {
   private val N = 10000
 
   def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = N): Double = {
-    1.0 * this.filter(given).sample(samples).count(pred) / samples
+    1.0 * this.filter(given).samplePar(samples).count(pred) / samples
   }
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
