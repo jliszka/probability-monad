@@ -1,6 +1,9 @@
 package probability_monad
 
+import java.util.concurrent.ThreadLocalRandom
+
 import scala.annotation.tailrec
+import scala.collection.parallel.immutable.ParSeq
 import scala.math.BigDecimal
 import scala.util.Random
 
@@ -43,7 +46,7 @@ trait Distribution[A] {
   }
 
   def repeat(n: Int): Distribution[List[A]] = new Distribution[List[A]] {
-    override def get = List.fill(n)(self.get)
+    override def get = self.sample(n)
   }
 
   /**
@@ -83,12 +86,14 @@ trait Distribution[A] {
   private val N = 10000
 
   def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = N): Double = {
-    1.0 * this.filter(given).sample(samples).count(pred) / samples
+    1.0 * this.filter(given).samplePar(samples).count(pred) / samples
   }
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
   // value of a die roll, for example, you have to do die.map(_.toDouble).ev.
-  def ev(implicit toDouble: A <:< Double): Double = Stream.fill(N)(toDouble(self.get)).sum / N
+  def ev(implicit toDouble: A <:< Double): Double = {
+    (0 until N).par.map(i => toDouble(self.get) / N).sum
+  }
 
   def mean(implicit toDouble: A <:< Double): Double = ev
 
@@ -123,6 +128,8 @@ trait Distribution[A] {
   }
 
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
+
+  def samplePar(n: Int = N): ParSeq[A] = (0 until N).par.map(i => self.get)
 
   /**
    * "Freeze" a distribution by taking a sample and serving values out of that sample at random.
@@ -207,10 +214,10 @@ trait Distribution[A] {
 
   def bucketedHist(min: Double, max: Double, nbuckets: Int, roundDown: Boolean = false)
                   (implicit ord: Ordering[A], toDouble: A <:< Double) {
-    val data = this.sample(N).toList.sorted.filter(a => {
+    val data = this.sample(N).filter(a => {
       val x = toDouble(a)
       min <= x && x <= max
-    })
+    }).sorted
     bucketedHistHelper(BigDecimal(min), BigDecimal(max), nbuckets, data, roundDown)(ord, toDouble)
   }
 
@@ -239,7 +246,7 @@ trait Distribution[A] {
 }
 
 object Distribution {
-  private val rand = new Random()
+  private val rand = ThreadLocalRandom.current()
 
   def always[A](value: A) = new Distribution[A] {
     override def get = value
