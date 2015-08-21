@@ -60,6 +60,8 @@ credentials ++= {
   }
 }
 
+pgpSecretRing := Path.userHome / ".gnupg" / "secring.gpg"
+
 initialCommands := """
                 |import probability_monad._
                 |import probability_monad.Distribution._
