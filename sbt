@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Internal options, always specified
-INTERNAL_OPTS="-Dfile.encoding=UTF-8 -Xss8M -Xmx1G -noverify -XX:+CMSClassUnloadingEnabled -XX:+UseConcMarkSweepGC -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=128M"
+INTERNAL_OPTS="-Dfile.encoding=UTF-8 -Xss8M -Xmx1G -noverify -XX:+CMSClassUnloadingEnabled -XX:+UseConcMarkSweepGC -XX:ReservedCodeCacheSize=128M"
 
 # Default options, if nothing is specified
 DEFAULT_OPTS=""
 
-SBT_VERSION="0.12.3"
+SBT_VERSION="0.13.5"
 SBT_LAUNCHER="$(dirname $0)/project/sbt-launch-$SBT_VERSION.jar"
 
 if [ ! -e "$SBT_LAUNCHER" ];
