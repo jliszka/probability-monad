@@ -9,7 +9,7 @@ import scala.util.Random
 
 trait Distribution[A] {
   self =>
-  protected def get: A
+  protected[probability_monad] def get: A
 
   override def toString = "<distribution>"
 
@@ -131,14 +131,6 @@ trait Distribution[A] {
 
   def samplePar(n: Int = N): ParSeq[A] = (0 until N).par.map(i => self.get)
 
-  /**
-   * "Freeze" a distribution by taking a sample and serving values out of that sample at random.
-   * Useful for when a distribution is expensive to compute and is being sampled from repeatedly.
-   */
-  def freeze: Distribution[A] = {
-    Distribution.discreteUniform(sample(N*10))
-  }
-
   def zip[B](d: Distribution[B]): Distribution[(A, B)] = new Distribution[(A, B)] {
     override def get = (self.get, d.get)
   }
@@ -245,8 +237,9 @@ trait Distribution[A] {
   }
 }
 
-object Distribution {
-  private val rand = ThreadLocalRandom.current()
+object Distribution extends Distributions(ThreadLocalRandom.current())
+
+class Distributions(private val rand: Random) {
 
   def always[A](value: A) = new Distribution[A] {
     override def get = value
@@ -489,5 +482,13 @@ object Distribution {
     }).sum * 2
     val df = (rowValues.size - 1) * (colValues.size - 1)
     chi2(df).pr(_ > chi2stat)
+  }
+
+  /**
+    * "Freeze" a distribution by taking a sample and serving values out of that sample at random.
+    * Useful for when a distribution is expensive to compute and is being sampled from repeatedly.
+    */
+  def freeze[A](d: Distribution[A], sampleSize: Int = 10000): Distribution[A] = {
+    discreteUniform(d.sample(sampleSize*10))
   }
 }
