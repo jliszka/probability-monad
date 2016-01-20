@@ -255,7 +255,9 @@ class Distributions(private val rand: Random) {
   def coin: Distribution[Coin] = discreteUniform(List(H, T))
   def biasedCoin(p: Double): Distribution[Coin] = discrete(H -> p, T -> (1-p))
 
-  def d(n: Int) = discreteUniform(1 to n)
+  def d(n: Int): Distribution[Int] = new Distribution[Int] {
+    override def get = rand.nextInt(n) + 1
+  }
   def die = d(6)
   def dice(n: Int) = die.repeat(n)
 
@@ -488,7 +490,7 @@ class Distributions(private val rand: Random) {
     * "Freeze" a distribution by taking a sample and serving values out of that sample at random.
     * Useful for when a distribution is expensive to compute and is being sampled from repeatedly.
     */
-  def freeze[A](d: Distribution[A], sampleSize: Int = 10000): Distribution[A] = {
-    discreteUniform(d.sample(sampleSize*10))
+  def freeze[A](d: Distribution[A], sampleSize: Int = 100000): Distribution[A] = {
+    discreteUniform(d.sample(sampleSize))
   }
 }
