@@ -14,47 +14,53 @@ Here's how you would code up the following problem: You are given either a fair 
 biased coin with equal probability. If you flip it 5 times and it comes up heads each time, what is the
 probability you have the fair coin?
 
-    case class Trial(haveFairCoin: Boolean, flips: List[Coin])
+```scala
+case class Trial(haveFairCoin: Boolean, flips: List[Coin])
 
-    def bayesianCoin(nflips: Int): Distribution[Trial] = {
-      for {
-        haveFairCoin <- tf()
-        c = if (haveFairCoin) coin else biasedCoin(0.9)
-        flips <- c.repeat(nflips)
-      } yield Trial(haveFairCoin, flips)
-    }
+def bayesianCoin(nflips: Int): Distribution[Trial] = {
+  for {
+    haveFairCoin <- tf()
+    c = if (haveFairCoin) coin else biasedCoin(0.9)
+    flips <- c.repeat(nflips)
+  } yield Trial(haveFairCoin, flips)
+}
 
-    bayesianCoin(5).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
+bayesianCoin(5).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
+```
 
 Or: You repeatedly roll a 6-sided die and keep a running sum. What is the probability the sum reaches
 exactly 30?
 
-    def dieSum(rolls: Int): Distribution[List[Int]] = {
-      markov(rolls, List(0))(runningSum => for {
-        d <- die
-      } yield (d + runningSum.head) :: runningSum)
-    }
+```scala
+def dieSum(rolls: Int): Distribution[List[Int]] = {
+  markov(rolls, List(0))(runningSum => for {
+    d <- die
+  } yield (d + runningSum.head) :: runningSum)
+}
 
-    dieSum(30).pr(_ contains 30)
+dieSum(30).pr(_ contains 30)
+```
 
 Or: Each family has children until it has a boy, and then stops. What is the expected fraction of girls in the population?
 
-    sealed abstract class Child
-    case object Boy extends Child
-    case object Girl extends Child
+```scala
+sealed abstract class Child
+case object Boy extends Child
+case object Girl extends Child
 
-    def family = {
-      discreteUniform(List(Boy, Girl)).until(_ contains Boy)
-    }
+def family = {
+  discreteUniform(List(Boy, Girl)).until(_ contains Boy)
+}
 
-    def population(families: Int) = {
-      for {
-        children <- family.repeat(families).map(_.flatten)
-        val girls = children.count(_ == Girl)
-      } yield 1.0 * girls / children.length
-    }
+def population(families: Int) = {
+  for {
+    children <- family.repeat(families).map(_.flatten)
+    val girls = children.count(_ == Girl)
+  } yield 1.0 * girls / children.length
+}
 
-    population(4).ev
+population(4).ev
+```
 
 ## How it works
 
@@ -69,10 +75,12 @@ You can think of a ```Distribution[T]``` as a collection like any other scala co
 ```flatMap``` and ```filter``` over. The presence of these methods allow you to use scala's for-comprehensions to manipulate
 distributions. For example, here's how you would create a distribution that represents the sum of 2 die rolls:
 
-    val dice = for {
-      d1 <- die
-      d2 <- die
-    } yield d1 + d2
+```scala
+val dice = for {
+  d1 <- die
+  d2 <- die
+} yield d1 + d2
+```
 
 Here, ```die``` is a ```Distribution[Int]```, and ```d1``` and ```d2``` are both ```Int```s. The type of ```dice```
 is ```Distribution[Int]```. You can see that for-comprehensions are an easy way to define new a distribution in terms of individual
