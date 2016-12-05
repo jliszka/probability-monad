@@ -212,11 +212,11 @@ object Examples {
    * Simpson's Paradox
    */
 
-  abstract class Party
+  sealed abstract class Party
   case object Democrat extends Party
   case object Republican extends Party
 
-  abstract class State
+  sealed abstract class State
   case object North extends State
   case object South extends State
 
