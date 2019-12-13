@@ -6,7 +6,7 @@ Makes it easy to create, manipulate and sample probability distributions.
 
 Include this in your sbt config:
 
-    "org.jliszka" %% "probability-monad" % "1.0.1"
+    "org.jliszka" %% "probability-monad" % "1.0.3"
 
 ## Examples
 
