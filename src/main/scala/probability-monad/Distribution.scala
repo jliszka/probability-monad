@@ -7,6 +7,9 @@ import scala.collection.parallel.immutable.ParSeq
 import scala.math.BigDecimal
 import scala.util.Random
 
+import scala.collection.compat._
+import CompatParColls.Converters._
+
 trait Distribution[A] {
   self =>
   protected[probability_monad] def get: A
@@ -173,10 +176,10 @@ trait Distribution[A] {
   }
 
   def histData: Map[A, Double] = {
-    this.sample(N).groupBy(x=>x).mapValues(_.length.toDouble / N)
+    this.sample(N).groupBy(x=>x).view.mapValues(_.length.toDouble / N).toMap
   }
 
-  private def plotHist(implicit ord: Ordering[A] = null) {
+  private def plotHist(implicit ord: Ordering[A] = null): Unit = {
     val histogram = this.histData.toList
     val sorted = if (ord == null) histogram else histogram.sortBy(_._1)(ord)
     doPlot(sorted)
@@ -196,7 +199,7 @@ trait Distribution[A] {
     (outerMin, outerMax, bestWidth, actualBuckets)
   }
 
-  def bucketedHist(buckets: Int)(implicit ord: Ordering[A], toDouble: A <:< Double) {
+  def bucketedHist(buckets: Int)(implicit ord: Ordering[A], toDouble: A <:< Double): Unit = {
     val data = this.sample(N).toList.sorted
     val min = data.head
     val max = data.last
@@ -205,7 +208,7 @@ trait Distribution[A] {
   }
 
   def bucketedHist(min: Double, max: Double, nbuckets: Int, roundDown: Boolean = false)
-                  (implicit ord: Ordering[A], toDouble: A <:< Double) {
+                  (implicit ord: Ordering[A], toDouble: A <:< Double): Unit = {
     val data = this.sample(N).filter(a => {
       val x = toDouble(a)
       min <= x && x <= max
@@ -214,19 +217,20 @@ trait Distribution[A] {
   }
 
   private def bucketedHistHelper(min: BigDecimal, max: BigDecimal, nbuckets: Int, data: List[A], roundDown: Boolean)
-                  (implicit ord: Ordering[A], toDouble: A <:< Double) {
+                  (implicit ord: Ordering[A], toDouble: A <:< Double): Unit = {
     val rm = if (roundDown) BigDecimal.RoundingMode.DOWN else BigDecimal.RoundingMode.HALF_UP
     val width = (max - min) / nbuckets
     def toBucket(a: A): BigDecimal = ((toDouble(a) - min) / width).setScale(0, rm) * width + min
     val n = data.size
     val bucketToProb = data
       .groupBy(toBucket)
-      .mapValues(_.size.toDouble / n)
+      .map({ case (b, vs) => b -> vs.size.toDouble / n })
+      .toMap
     val bucketed = (min to max by width).map(a => a -> bucketToProb.getOrElse(a, 0.0))
     doPlot(bucketed)
   }
 
-  private def doPlot[B](data: Iterable[(B, Double)]) = {
+  private def doPlot[B](data: Iterable[(B, Double)]): Unit = {
     val scale = 100
     val maxWidth = data.map(_._1.toString.length).max
     val fmt = "%"+maxWidth+"s %5.2f%% %s"

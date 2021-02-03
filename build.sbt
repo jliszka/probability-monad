@@ -1,12 +1,24 @@
-name := "probability-monad" // insert clever name here
+name := "probability-monad"
 
 scalaVersion := "2.12.10"
 
-crossScalaVersions := Seq("2.12.10", "2.13.3")
+crossScalaVersions := Seq("2.12.10", "2.13.4")
 
 scalacOptions ++= Seq("-Xfatal-warnings", "-deprecation")
 
-version := "1.0.3"
+libraryDependencies ++= {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, major)) if major <= 12 =>
+      Seq()
+    case _ =>
+      Seq("org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0")
+  }
+}
+
+libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.1"
+
+
+version := "1.0.4"
 
 organization := "org.jliszka"
 
@@ -60,7 +72,12 @@ credentials ++= {
   }
 }
 
-pgpSecretRing := Path.userHome / ".gnupg" / "secring.gpg"
+credentials += Credentials(
+  "GnuPG Key ID",
+  "gpg",
+  "66F429E63C9C54A82A217E83410CF5BA60429BD7", // key identifier
+  "ignored" // this field is ignored; passwords are supplied by pinentry
+)
 
 initialCommands := """
                 |import probability_monad._
