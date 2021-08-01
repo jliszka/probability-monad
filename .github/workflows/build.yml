@@ -1,0 +1,22 @@
+name: Build
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      matrix:
+        scalaVersion: ["2.12.14", "2.13.6"]
+        platform: ["JS", "JVM", "Native"]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v6
+      - uses: olafurpg/setup-scala@v12
+
+      - name: Test
+        run: sbt ++${{matrix.scalaVersion}} probabilityMonad${{matrix.platform}}/compile
