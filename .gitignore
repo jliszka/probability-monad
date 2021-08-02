@@ -3,3 +3,6 @@ target
 *.class
 .lib
 project/*.jar
+
+/.bsp
+project/**/metals.sbt

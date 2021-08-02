@@ -1,37 +1,44 @@
-name := "probability-monad"
+lazy val probabilityMonad = (
+  crossProject(JSPlatform, JVMPlatform, NativePlatform)
+    .crossType(CrossType.Pure)
+    .in(file("."))
+  )
+  .settings(
 
-scalaVersion := "2.12.10"
+name := "probability-monad",
 
-crossScalaVersions := Seq("2.12.10", "2.13.4")
+scalaVersion := crossScalaVersions.value.last,
 
-scalacOptions ++= Seq("-Xfatal-warnings", "-deprecation")
+crossScalaVersions := Seq("2.12.14", "2.13.6"),
+
+scalacOptions ++= Seq("-Xfatal-warnings", "-deprecation"),
 
 libraryDependencies ++= {
   CrossVersion.partialVersion(scalaVersion.value) match {
     case Some((2, major)) if major <= 12 =>
       Seq()
     case _ =>
-      Seq("org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.0")
+      Seq("org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.3")
   }
-}
+},
 
-libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.1"
+libraryDependencies += "org.scala-lang.modules" %%% "scala-collection-compat" % "2.5.0",
 
 
-version := "1.0.4"
+version := "1.0.4",
 
-organization := "org.jliszka"
+organization := "org.jliszka",
 
-publishMavenStyle := true
+publishMavenStyle := true,
 
-publishArtifact in Test := false
+Test / publishArtifact := false,
 
 publishTo := {
   val nexus = "https://oss.sonatype.org/"
   Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
+},
 
-pomIncludeRepository := { _ => false }
+pomIncludeRepository := { _ => false },
 
 pomExtra := (
   <url>http://github.com/jliszka/probability-monad</url>
@@ -52,7 +59,7 @@ pomExtra := (
       <name>Jason Liszka</name>
       <url>http://jliszka.github.io</url>
     </developer>
-  </developers>)
+  </developers>),
 
 credentials ++= {
   val sonatype = ("Sonatype Nexus Repository Manager", "oss.sonatype.org")
@@ -70,16 +77,17 @@ credentials ++= {
     case (_, mvn) if mvn.canRead => loadMavenCredentials(mvn)
     case _ => Nil
   }
-}
+},
 
 credentials += Credentials(
   "GnuPG Key ID",
   "gpg",
   "66F429E63C9C54A82A217E83410CF5BA60429BD7", // key identifier
   "ignored" // this field is ignored; passwords are supplied by pinentry
-)
+),
 
 initialCommands := """
                 |import probability_monad._
                 |import probability_monad.Distribution._
                 |import probability_monad.Examples._""".stripMargin('|')
+)
