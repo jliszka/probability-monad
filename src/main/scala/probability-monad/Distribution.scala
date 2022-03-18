@@ -95,7 +95,7 @@ trait Distribution[A] {
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
   // value of a die roll, for example, you have to do die.map(_.toDouble).ev.
   def ev(implicit toDouble: A <:< Double): Double = {
-    (0 until N).par.map(_ => toDouble(self.get)).aggregate(0d)(_ + _ / N, _ + _)
+    (0 until N).map(_ => toDouble(self.get)).aggregate(0d)(_ + _ / N, _ + _)
   }
 
   def mean(implicit toDouble: A <:< Double): Double = ev
