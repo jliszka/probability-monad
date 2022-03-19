@@ -22,7 +22,12 @@ libraryDependencies ++= {
   }
 },
 
-libraryDependencies += "org.scala-lang.modules" %%% "scala-collection-compat" % "2.5.0",
+libraryDependencies ++= Seq(
+  "org.scala-lang.modules" %%% "scala-collection-compat" % "2.5.0",
+  "org.scalatest"          %%% "scalatest"               % "3.2.11" % Test,
+  "org.scalactic"          %%% "scalactic"               % "3.2.11" % Test,
+),
+
 
 
 version := "1.0.4",

@@ -19,4 +19,4 @@ jobs:
       - uses: olafurpg/setup-scala@v12
 
       - name: Test
-        run: sbt ++${{matrix.scalaVersion}} probabilityMonad${{matrix.platform}}/compile
+        run: sbt ++${{matrix.scalaVersion}} probabilityMonad${{matrix.platform}}/test
