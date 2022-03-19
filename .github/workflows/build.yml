@@ -9,8 +9,8 @@ jobs:
   build:
     strategy:
       matrix:
-        scalaVersion: ["2.12.14", "2.13.6"]
-        platform: ["JS", "JVM", "Native"]
+        scalaVersion: ["2.12.15", "2.13.8"]
+        platform: ["JS", "JVM"]
     runs-on: ubuntu-latest
 
     steps:
@@ -19,4 +19,4 @@ jobs:
       - uses: olafurpg/setup-scala@v12
 
       - name: Test
-        run: sbt ++${{matrix.scalaVersion}} probabilityMonad${{matrix.platform}}/compile
+        run: sbt ++${{matrix.scalaVersion}} probabilityMonad${{matrix.platform}}/test
