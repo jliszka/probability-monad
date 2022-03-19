@@ -9,8 +9,8 @@ jobs:
   build:
     strategy:
       matrix:
-        scalaVersion: ["2.12.14", "2.13.6"]
         platform: ["JS", "JVM", "Native"]
+        scalaVersion: ["2.12.15", "2.13.8"]
     runs-on: ubuntu-latest
 
     steps:
