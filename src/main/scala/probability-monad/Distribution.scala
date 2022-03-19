@@ -34,7 +34,7 @@ trait Distribution[A] {
 
   def withFilter(pred: A => Boolean): Distribution[A] = filter(pred)
 
-  def given(pred: A => Boolean): Distribution[A] = filter(pred)
+  def `given`(pred: A => Boolean): Distribution[A] = filter(pred)
 
   def until(pred: List[A] => Boolean): Distribution[List[A]] = new Distribution[List[A]] {
     override def get = {
@@ -88,14 +88,20 @@ trait Distribution[A] {
 
   private val N = 10000
 
-  def pr(pred: A => Boolean, given: A => Boolean = (a: A) => true, samples: Int = N): Double = {
-    1.0 * this.filter(given).samplePar(samples).count(pred) / samples
+  def pr(pred: A => Boolean, `given`: A => Boolean = (a: A) => true, samples: Int = N): Double = {
+    1.0 * this.filter(`given`).sample(samples).count(pred) / samples
   }
 
   // NB: Expected value only makes sense for real-valued distributions. If you want to find the expected
   // value of a die roll, for example, you have to do die.map(_.toDouble).ev.
   def ev(implicit toDouble: A <:< Double): Double = {
-    (0 until N).par.map(_ => toDouble(self.get)).aggregate(0d)(_ + _ / N, _ + _)
+    var i = 0
+    var sum:Double = 0
+    while(i < N) {
+      sum += toDouble(self.get)
+      i += 1
+    }
+    sum / N
   }
 
   def mean(implicit toDouble: A <:< Double): Double = ev
