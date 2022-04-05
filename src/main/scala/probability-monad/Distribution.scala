@@ -137,6 +137,7 @@ trait Distribution[A] {
   }
 
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
+  def sampleSingle(): A = self.get
 
   def samplePar(n: Int = N): ParSeq[A] = (0 until N).par.map(i => self.get)
 
