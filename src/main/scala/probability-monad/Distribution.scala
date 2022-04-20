@@ -139,7 +139,7 @@ trait Distribution[A] {
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
   def sampleSingle(): A = self.get
 
-  def samplePar(n: Int = N): ParSeq[A] = (0 until N).par.map(i => self.get)
+  def samplePar(n: Int = N): ParSeq[A] = (0 until n).par.map(i => self.get)
 
   def zip[B](d: Distribution[B]): Distribution[(A, B)] = new Distribution[(A, B)] {
     override def get = (self.get, d.get)
