@@ -7,7 +7,6 @@ import scala.collection.parallel.immutable.ParSeq
 import scala.math.BigDecimal
 import scala.util.Random
 
-import scala.collection.compat._
 import CompatParColls.Converters._
 
 trait Distribution[A] {
@@ -41,7 +40,6 @@ trait Distribution[A] {
       @tailrec
       def helper(sofar: List[A]): List[A] = {
         if (pred(sofar)) sofar
-
         else helper(self.get :: sofar)
       }
       helper(Nil)
@@ -106,13 +104,10 @@ trait Distribution[A] {
 
   def mean(implicit toDouble: A <:< Double): Double = ev
 
-  private def square(x: Double) = x * x
-  private def cube(x: Double) = x * x * x
-
   def variance(implicit toDouble: A <:< Double): Double = {
     val mean = this.mean
     this.map(x => {
-      square(toDouble(x) - mean)
+      math.pow(toDouble(x) - mean, 2)
     }).ev
   }
 
@@ -124,7 +119,7 @@ trait Distribution[A] {
     val mean = this.mean
     val stdev = this.stdev
     this.map(x => {
-      cube((toDouble(x) - mean) / stdev)
+      math.pow((toDouble(x) - mean) / stdev, 3)
     }).ev
   }
 
@@ -132,8 +127,46 @@ trait Distribution[A] {
     val mean = this.mean
     val variance = this.variance
     this.map(x => {
-      square(square(toDouble(x) - mean))
-    }).ev / square(variance)
+      math.pow(toDouble(x) - mean, 4)
+    }).ev / math.pow(variance, 2)
+  }
+
+  def entropy(n: Int = N)(implicit toDouble: A <:< Double = null): Double = {
+    if (toDouble != null) {
+      // Differential entropy
+      val xs = sample(n).map(toDouble).sorted
+      val pairs = xs.zip(xs.tail)
+      val p = 1.0 / pairs.length
+      pairs.map({ case (a, b) => {
+        val y = p / (b - a)
+        -(b - a) * y * math.log(y)
+      }}).sum + 1/math.sqrt(3)
+    } else {
+      // Discrete entropy
+      val ps = sample().groupBy(x => x).toList.map(_._2.length * 1.0 / N)
+      ps.map(p => -p * math.log(p) / math.log(2)).sum
+    }
+  }
+
+  def pdf(x: Double)(implicit toDouble: A <:< Double = null): Double = {
+    val h = math.pow(4 * math.pow(this.stdev, 5) / (3 * N), 0.2)
+    def normPDF(x: Double): Double = math.exp(-0.5 * x * x) / math.sqrt(2 * math.Pi)
+    val xs = sample().map(toDouble)
+    xs.map(xi => normPDF((x - xi) / h)).sum / (xs.length * h)
+  }
+
+  def entropyFromPDF(buckets: Int = 100)(implicit toDouble: A <:< Double): Double = {
+    val h = math.pow(4 * math.pow(this.stdev, 5) / (3 * N), 0.2)
+    val xs = sample().map(toDouble)
+    def normPDF(x: Double): Double = math.exp(-0.5 * x * x) / math.sqrt(2 * math.Pi)
+    def pdf(x: Double): Double = xs.map(xi => normPDF((x - xi) / h)).sum / (xs.length * h)
+    val (a, b) = (xs.min, xs.max)
+    val bucketWidth = (b - a) / buckets
+    (0 to buckets).map(i => {
+      val x = a + bucketWidth * (i + 0.5)
+      val y = pdf(x)
+      -y * math.log(y) * bucketWidth
+    }).sum
   }
 
   def sample(n: Int = N): List[A] = List.fill(n)(self.get)
@@ -174,6 +207,10 @@ trait Distribution[A] {
     override def get = toDouble(self.get) / toDouble(x)
   }
 
+  def <(d: Distribution[A])(implicit ord: Ordering[A]): Distribution[Boolean] = new Distribution[Boolean] {
+    override def get = ord.lt(self.get, d.get)
+  }
+
   def hist(implicit ord: Ordering[A] = null, d: A <:< Double = null) = {
     if (d == null) {
       plotHist(ord)
@@ -183,7 +220,7 @@ trait Distribution[A] {
   }
 
   def histData: Map[A, Double] = {
-    this.sample(N).groupBy(x=>x).view.mapValues(_.length.toDouble / N).toMap
+    this.sample(N).groupBy(x=>x).toList.map({ case (k, vs) => k -> vs.length.toDouble / N }).toMap
   }
 
   private def plotHist(implicit ord: Ordering[A] = null): Unit = {
@@ -207,7 +244,7 @@ trait Distribution[A] {
   }
 
   def bucketedHist(buckets: Int)(implicit ord: Ordering[A], toDouble: A <:< Double): Unit = {
-    val data = this.sample(N).toList.sorted
+    val data = this.sample(N*2).sorted
     val min = data.head
     val max = data.last
     val (outerMin, outerMax, width, nbuckets) = findBucketWidth(toDouble(min), toDouble(max), buckets)
@@ -216,7 +253,7 @@ trait Distribution[A] {
 
   def bucketedHist(min: Double, max: Double, nbuckets: Int, roundDown: Boolean = false)
                   (implicit ord: Ordering[A], toDouble: A <:< Double): Unit = {
-    val data = this.sample(N).filter(a => {
+    val data = this.sample(N*2).filter(a => {
       val x = toDouble(a)
       min <= x && x <= max
     }).sorted
@@ -242,15 +279,23 @@ trait Distribution[A] {
     val maxWidth = data.map(_._1.toString.length).max
     val fmt = "%"+maxWidth+"s %5.2f%% %s"
     data.foreach{ case (a, p) => {
-      val hashes = (p * scale).toInt
-      println(fmt.format(a.toString, p*100, "#" * hashes))
+      val hashes = p * scale
+      val whole = hashes.toInt
+      val frac = ((hashes - whole) * 8).toInt
+      val partial = if (frac > 0) Character.toString((0x2590 - frac).toChar) else ""
+      println(fmt.format(a.toString, p*100, "\u2588" * whole + partial))
     }}
   }
 }
 
-object Distribution extends Distributions(ThreadLocalRandom.current())
+object Distribution extends Distributions(new Random)
 
 class Distributions(private val rand: Random) {
+
+  implicit def listOrd[A: Ordering]: Ordering[List[A]] = {
+    import scala.math.Ordering.Implicits._
+    implicitly[Ordering[List[A]]]
+  }
 
   def always[A](value: A) = new Distribution[A] {
     override def get = value
@@ -350,8 +395,16 @@ class Distributions(private val rand: Random) {
     override def get = rand.nextGaussian()
   }
 
+  def chi(n: Int): Distribution[Double] = {
+    chi2(n).map(math.sqrt)
+  }
+
   def chi2(n: Int): Distribution[Double] = {
     normal.map(x => x*x).repeat(n).map(_.sum)
+  }
+
+  def boltzmann(s: Double): Distribution[Double] = {
+    chi(3) * s
   }
 
   def students_t(df: Int): Distribution[Double] = {
@@ -371,6 +424,10 @@ class Distributions(private val rand: Random) {
     for {
       x <- uniform
     } yield math.log(x) / (-l)
+  }
+
+  def erlang(k: Int, l: Double): Distribution[Double] = {
+    exponential(l).repeat(k).map(_.sum)
   }
 
   def laplace(b: Double): Distribution[Double] = {
@@ -396,6 +453,19 @@ class Distributions(private val rand: Random) {
     for {
       y <- exponential(1)
     } yield l * math.pow(y, 1/k)
+  }
+
+  def logistic(m: Double, s: Int): Distribution[Double] = {
+    for {
+      y <- exponential(1)
+    } yield m + s * math.log(math.exp(y)-1)
+  }
+
+  def rayleigh(s: Double): Distribution[Double] = {
+    for {
+      x <- normal * s
+      y <- normal * s
+    } yield math.sqrt(x*x + y*y)
   }
 
   def gamma(k: Double, theta: Double): Distribution[Double] = {

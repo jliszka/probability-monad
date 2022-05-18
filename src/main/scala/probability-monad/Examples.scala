@@ -31,6 +31,99 @@ object Examples {
     coin.until(cs => cs.length >= flips && cs.take(flips).forall(_ == H)).map(_.length)
   }
 
+  object Permute {
+    // https://twitter.com/adereth/status/1402395550369021957?s=20
+
+    def naive(ws: List[Double]): Distribution[List[Double]] = {
+      if (ws.length <= 1) always(ws)
+      else {
+        discrete(ws.zipWithIndex.zip(ws):_*).flatMap({ case (w, i) => {
+          val rest = ws.take(i) ++ ws.drop(i+1)
+          naive(rest).map(w::_)
+        }})
+      }
+    }
+
+    def mergeSort(ws: List[Double]): Distribution[List[Double]] = {
+      def merge(xs: List[Double], px: Double, ys: List[Double], py: Double): Distribution[List[Double]] = {
+        (xs, ys) match {
+          case (Nil, _) => always(ys)
+          case (_, Nil) => always(xs)
+          case (x::xt, y::yt) => uniform.flatMap(u =>
+            if (u < px / (px + py))
+              merge(xt, px - x, ys, py).map(x::_)
+            else
+              merge(xs, px, yt, py - y).map(y::_)
+          )
+        }
+      }
+      if (ws.length <= 1) always(ws)
+      else {
+        val left = ws.take(ws.length / 2)
+        val right = ws.drop(ws.length / 2)
+        for {
+          sortedLeft <- mergeSort(left)
+          sortedRight <- mergeSort(right)
+          merged <- merge(sortedLeft, sortedLeft.sum, sortedRight, sortedRight.sum)
+        } yield merged
+      }
+    }
+
+    def betaSort(ws: List[Double]): Distribution[List[Double]] = {
+      sequence(ws.map(w => beta(1, w))).map(_.zip(ws).sortBy(_._1).map(_._2))
+    }
+  }
+
+  object BattleRoyale {
+    case class Player(skill: Double, wins: Int, games: Int) {
+      def winRate: Double = 1.0 * wins / games
+      def win: Player = this.copy(wins = wins+1, games = games+1)
+      def loss: Player = this.copy(games = games+1)
+    }
+
+    def sortPlayers(players: List[Player]): Distribution[List[Player]] = {
+      val totalSkill = players.map(_.skill).sum
+      sequence(players.map(p => beta(p.skill / totalSkill, 1))).map(_.zip(players).sortBy(_._1).map(_._2))
+    }
+
+    def tournament(g: Int, rounds: Int, skill: Distribution[Double]): Distribution[List[List[Player]]] = {
+      val players: Distribution[List[Player]] = {
+        val nPlayers = g * (g+1) / 2
+        skill.repeat(nPlayers).map(_.map(s => Player(s, 0, 0)))
+      }
+      def makeGames(players: List[Player], games: List[List[Player]] = Nil, n: Int = 1): List[List[Player]] = {
+        if (players.isEmpty) games
+        else makeGames(players.drop(n), players.take(n) :: games, n+1)
+      }
+      val games: Distribution[List[List[Player]]] = for {
+        ps <- players
+        g <- sequence(makeGames(ps).map(sortPlayers))
+      } yield g
+      def round(gs: List[List[Player]]): Distribution[List[List[Player]]] = {
+        val gameOver = gs.map(ps => if (ps.tail.isEmpty) ps.head.win else ps.head.loss)
+        val stillPlaying = gs.map(_.tail).filterNot(_.isEmpty)
+        sortPlayers(gameOver).map(_ :: stillPlaying)
+      }
+      games.markov(rounds)(round)
+    }
+    lazy val worst = tournament(20, 100, uniform).map(_.head).flatMap(discreteUniform)
+    lazy val ps = freeze(worst, 10000)
+    def g(skill: Double) = ps.repeat(19).map(Player(skill, 0, 0)::_).flatMap(sortPlayers)
+  }
+
+  /**
+   * Polya urn problem: start with some number of black and white balls in an urn. Choose a ball,
+   * replace it and add one more ball of the same color. The proportion of black and white balls
+   * converges to the beta distribution.
+   */
+
+  def polya(black: Double, white: Double, trials: Int = 1000): Distribution[Double] = {
+    always((black, white)).markov(trials)({ case (a: Double, b: Double) => {
+      tf(a / (a + b)).map(x => if (x) (a+1, b) else (a, b+1))
+    }}).map({ case (a: Double, b: Double) => a / (a + b) })
+  }
+
+
 
   /**
    * ELISA AIDS test. What is the probability you have the disease given a positive test result?
@@ -459,8 +552,8 @@ object Examples {
 
   def runSmoking = {
     println("p(cancer) = " + smoking.pr(_.cancer))
-    println("p(cancer|smoking) = " + smoking.pr(_.cancer, _.smoker))
-    println("p(cancer|do(smoking)) = " + doSmoking.pr(_.cancer, _.smoker))
+    println("p(cancer|smoking) = " + smoking.given(_.smoker).pr(_.cancer))
+    println("p(cancer|do(smoking)) = " + doSmoking.given(_.smoker).pr(_.cancer))
     println()
     println("Since p(cancer|do(smoking)) < p(cancer), smoking actually prevents cancer (according to our made-up numbers)")
     println("even though, naively, p(cancer|smoking) > p(cancer)!")

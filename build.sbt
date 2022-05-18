@@ -89,10 +89,12 @@ credentials += Credentials(
   "gpg",
   "66F429E63C9C54A82A217E83410CF5BA60429BD7", // key identifier
   "ignored" // this field is ignored; passwords are supplied by pinentry
-),
+)
+
+)
 
 initialCommands := """
-                |import probability_monad._
-                |import probability_monad.Distribution._
-                |import probability_monad.Examples._""".stripMargin('|')
-)
+              |import probability_monad._
+              |import probability_monad.Distribution._
+              |import probability_monad.Examples._""".stripMargin('|')
+
